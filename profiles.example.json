@@ -1,0 +1,4 @@
+[
+  { "id": "windows-pwsh", "platform": "windows", "shellDialect": "powershell", "command": "pwsh.exe" },
+  { "id": "wsl-kali", "platform": "wsl2", "shellDialect": "bash", "distro": "kali-linux", "user": "YOUR_NON_ROOT_USER", "shell": "/bin/bash", "initialDirectory": "~" }
+]
