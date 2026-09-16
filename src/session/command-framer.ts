@@ -19,8 +19,10 @@ export class BashCommandFramer implements CommandFramer {
       `__tb_cwd=$(builtin pwd -P)`,
       `__tb_cwd_b64=$(printf '%s' "$__tb_cwd" | /usr/bin/base64 -w0)`,
       `if [ "$__tb_status" -eq 0 ]; then __tb_ok=1; else __tb_ok=0; fi`,
-      `printf '\\036TB1:%s:${op}:%s:%s:%s\\037' "$__tb_token" "$__tb_ok" "$__tb_status" "$__tb_cwd_b64" >&$__tb_fd`,
-      `unset __tb_token __tb_payload __tb_status __tb_cwd __tb_cwd_b64 __tb_ok`
+      `printf -v __tb_body '%s:%s:%s:%s' '${op}' "$__tb_ok" "$__tb_status" "$__tb_cwd_b64"`,
+      `printf -v __tb_len '%08x' "\${#__tb_body}"`,
+      `printf 'TB1:%s:%s:%s' "$__tb_token" "$__tb_len" "$__tb_body" >&$__tb_fd`,
+      `unset __tb_token __tb_payload __tb_status __tb_cwd __tb_cwd_b64 __tb_ok __tb_body __tb_len`
     ].join('; ') + '\r';
     return { wire, completionToken };
   }
@@ -52,9 +54,10 @@ export class PowerShellCommandFramer implements CommandFramer {
       `$__tb_ok=(-not $__tb_terminating -and -not $__tb_new_errors -and (-not $__tb_native_observed -or $__tb_after_native -eq 0))`,
       `$__tb_cwd_b64=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Location).Path))`,
       `$__tb_ok_text=if($__tb_ok){'1'}else{'0'}`,
-      `$__tb_frame=[char]0x1e+'TB1:'+$__tb_token+':${op}:'+$__tb_ok_text+':'+$__tb_exit+':'+$__tb_cwd_b64+[char]0x1f`,
-      `[Console]::Out.Write($__tb_frame)`,
-      `Remove-Variable __tb_token,__tb_payload,__tb_before_error,__tb_before_native,__tb_native_sentinel,__tb_terminating,__tb_script,__tb_after_native,__tb_new_errors,__tb_native_observed,__tb_exit,__tb_ok,__tb_cwd_b64,__tb_ok_text,__tb_frame -ErrorAction SilentlyContinue`
+      `$__tb_body='${op}:'+$__tb_ok_text+':'+$__tb_exit+':'+$__tb_cwd_b64`,
+      `$__tb_len=$__tb_body.Length.ToString('x8')`,
+      `[Console]::Out.Write('TB1:'+$__tb_token+':'+$__tb_len+':'+$__tb_body)`,
+      `Remove-Variable __tb_token,__tb_payload,__tb_before_error,__tb_before_native,__tb_native_sentinel,__tb_terminating,__tb_script,__tb_after_native,__tb_new_errors,__tb_native_observed,__tb_exit,__tb_ok,__tb_cwd_b64,__tb_ok_text,__tb_body,__tb_len -ErrorAction SilentlyContinue`
     ].join('; ') + '\r';
     return { wire, completionToken };
   }
