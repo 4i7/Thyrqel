@@ -57,6 +57,7 @@ try {
     await expectReady(s.sessionId, '$false', true, null, 'False');
     await expectReady(s.sessionId, 'Get-Item C:\\does-not-exist; Write-Output STILL_OK', false, null, 'STILL_OK');
     await expectReady(s.sessionId, 'Get-Item C:\\does-not-exist | Out-String', false, null);
+    await expectReady(s.sessionId, '[Console]::Out.Write("`e[31mANSI_OK`e[0m`n")', true, null, 'ANSI_OK');
     await expectReady(s.sessionId, '$TB_VAR="var"; $env:TB_ENV="env"; function TB-Fn { "fn" }; Set-Location $env:TEMP', true, null);
     const persisted = await expectReady(s.sessionId, 'Write-Output "$TB_VAR,$env:TB_ENV,$(TB-Fn),$((Get-Location).Path)"', true, null);
     assert.match(persisted.output, /var,env,fn,/);
@@ -79,7 +80,8 @@ try {
     await expectReady(s.sessionId, "cat <<'TBEOF'\nheredoc-ok\nTBEOF", true, 0, 'heredoc-ok');
     await expectReady(s.sessionId, 'if true; then echo compound-ok; fi', true, 0, 'compound-ok');
     await expectReady(s.sessionId, 'x=$(printf substitution-ok); echo "$x"', true, 0, 'substitution-ok');
-    await expectReady(s.sessionId, "printf '\\036TB1:not-the-token:normal-output\\037\\n'", true, 0, 'normal-output');
+    await expectReady(s.sessionId, "printf 'TB1:not-the-token:00000004:fake\\nnormal-output\\n'", true, 0, 'normal-output');
+    await expectReady(s.sessionId, "printf '\\033[31mANSI_OK\\033[0m\\n'", true, 0, 'ANSI_OK');
     await expectReady(s.sessionId, 'exec >/dev/null', true, 0);
     await expectReady(s.sessionId, 'true', true, 0);
     console.log('PASS CP-2 Bash framing/control descriptor');
