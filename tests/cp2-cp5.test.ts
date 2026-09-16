@@ -11,7 +11,8 @@ const ps: Profile = { id: 'windows-pwsh', platform: 'windows', shellDialect: 'po
 const psIdentity = JSON.stringify({ shell: 'powershell', version: '7.6.5', edition: 'Core', cwd: 'C:\\' });
 
 function completionFrame(token: string, operationId: string, success: boolean, exitCode: number | null, cwd: string) {
-  return `\x1eTB1:${token}:${Buffer.from(operationId).toString('base64')}:${success ? '1' : '0'}:${exitCode ?? 'N'}:${Buffer.from(cwd).toString('base64')}\x1f`;
+  const body = `${Buffer.from(operationId).toString('base64')}:${success ? '1' : '0'}:${exitCode ?? 'N'}:${Buffer.from(cwd).toString('base64')}`;
+  return `TB1:${token}:${body.length.toString(16).padStart(8, '0')}:${body}`;
 }
 
 function fakePowerShell() {
@@ -41,12 +42,13 @@ function tokenFromWire(wire: string) {
   return halves[0]! + halves[1]!;
 }
 
-test('command framers encode payloads and do not echo the completion token contiguously', () => {
+test('command framers encode payloads and do not echo the completion marker contiguously', () => {
   for (const framer of [new BashCommandFramer(), new PowerShellCommandFramer()]) {
-    const command = "printf 'marker-like \\x1eTB1 text'";
+    const command = "printf 'marker-like TB1 text'";
     const framed = framer.frame(command, 'op_test');
     assert.equal(framed.wire.includes(command), false);
     assert.equal(framed.wire.includes(framed.completionToken), false);
+    assert.equal(framed.wire.includes(`TB1:${framed.completionToken}:`), false);
     assert.equal(framed.completionToken.length, 48);
   }
 });
@@ -72,11 +74,36 @@ test('completion detector handles every chunk split and preserves marker-like no
   }
 });
 
-test('completion detector fails closed on an oversized matching frame', () => {
+test('completion detector fails closed on malformed or oversized matching frames', () => {
   const token = 'b'.repeat(48);
+  const malformed = new CompletionDetector();
+  malformed.arm(token);
+  assert.throws(() => malformed.accept(`TB1:${token}:zzzzzzzz:`), { code: 'SESSION_PROTOCOL_ERROR' });
+
+  const oversized = new CompletionDetector();
+  oversized.arm(token);
+  assert.throws(() => oversized.accept(`TB1:${token}:00040001:`), { code: 'SESSION_PROTOCOL_ERROR' });
+});
+
+test('completion detector preserves ANSI outside the frame and accepts a long cwd within the bound', () => {
+  const token = 'c'.repeat(48);
+  const cwd = 'C:\\' + 'x'.repeat(32768);
+  const frame = completionFrame(token, 'op_long', true, null, cwd);
   const detector = new CompletionDetector();
   detector.arm(token);
-  assert.throws(() => detector.accept(`\x1eTB1:${token}:` + 'x'.repeat(17000)), { code: 'SESSION_PROTOCOL_ERROR' });
+  const parsed = detector.accept(`\x1b[31m${frame}\x1b[0mTAIL`);
+  assert.equal(parsed.output, '\x1b[31m\x1b[0mTAIL');
+  assert.deepEqual(parsed.completion, { operationId: 'op_long', success: true, exitCode: null, cwd });
+});
+
+test('flush restores an incomplete matching frame without losing its prefix or length header', () => {
+  const token = 'd'.repeat(48);
+  const frame = completionFrame(token, 'op_flush', true, 0, '/tmp');
+  const detector = new CompletionDetector();
+  detector.arm(token);
+  const partial = frame.slice(0, 70);
+  assert.equal(detector.accept(partial).output, '');
+  assert.equal(detector.flush(), partial);
 });
 
 test('step timeout remains active, rejects concurrent step, and delayed completion is readable', async () => {
