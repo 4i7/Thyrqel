@@ -112,6 +112,23 @@ The existing persistent reserved descriptor is unchanged. The same printable gra
 
 ## Current status
 
+**RESOLVED / LOCAL DEPENDENCY FIX**, 2026-09-17. CP-1 and CP-2..CP-5 strict
+qualification now PASS on Windows 11 / Node 24.15.0 / PowerShell 7.6.5.
+The source-level correction is pinned and rebuilt by npm ci; upstream 1.1.0
+without this patch remains unqualified. See [CP-1 evidence](CP1_REPORT.md) and
+[patch provenance and lifecycle invariant](../patches/node-pty-1.1.0/README.md).
+
+In addition to the helper race, native SetupExitCallback removed the PTY baton
+on its wait thread before invoking JS. The correction retains HPCON through the
+JS exit callback and confines registry mutation to that thread. Output EOF and
+exit can arrive in either order; neither alone disposes the drain resources.
+Worker/server shutdown is explicit and natural, with repeated process/handle
+checks. This closes the earlier escalation; it does not waive its failed tests.
+Printable framing and CP-2..CP-5 semantics are unchanged.
+DESIGN_CHANGE_REQUIRED: NONE. No merge or CP-6+ work.
+
+## Historical status — 2026-09-16
+
 **PARTIAL / ESCALATION_REQUIRED (external lifecycle dependency)**, 2026-09-16.
 Framing requalification was run; the earlier framing escalation is resolved.
 Starting checkout and PR head both matched

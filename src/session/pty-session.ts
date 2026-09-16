@@ -82,7 +82,7 @@ export class PtySession {
           this.activeStep = undefined;
           this.detector.reset();
           this.dispose();
-          // Keep the CP-1 cleanup behavior visible; this remains the known qualification blocker.
+          // The dependency owns drain/cleanup; repeating the public kill is idempotent.
           try { this.pty.kill(); }
           catch (cause) { this.fail(new TerminalError('SESSION_IO_FAILED', 'Exited PTY cleanup failed', { cause })); }
         }

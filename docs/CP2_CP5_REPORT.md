@@ -80,7 +80,28 @@ Target Windows smoke includes:
 - long-running foreground process / Ctrl+C;
 - simultaneous Kali/Kali/PowerShell sessions.
 
-## Qualification status
+## Qualification status — 2026-09-17
+
+The node-pty lifecycle correction resolves the cleanup failure without changing
+framing, ActiveStep, OutputRing, interactive handling, or the strict parents.
+See [CP-1 evidence](CP1_REPORT.md) for source ownership and runtime details.
+
+| Check | Result |
+| --- | --- |
+| npm ci | PASS: pinned patch applied, native module built and verified |
+| npm test | PASS: 26/26 including three dependency lifecycle ordering regressions |
+| npm run smoke | PASS: child exit=0, stderr=false, timeout=false |
+| npm run smoke:cp2-cp5 | PASS: child exit=0, stderr=false, timeout=false |
+| node dist/tests/diagnose-completion.js | PASS: pipe and PTY completion/postlude observed, clean exit |
+| node dist/tests/diagnose-lifecycle.js | PASS: OS/DLL close and natural exit; repeated cycles with no retained worker/pipe/child or accumulating handles |
+
+CP-1 Local PTY: PASS. CP-2 CommandFramer/Completion: PASS. CP-3 Interactive: PASS.
+CP-4 Long-running: PASS. CP-5 Multiple Sessions: PASS.
+CP-6 Relay, MCP, ChatGPT E2E: NOT STARTED. MVP COMPLETE is not claimed.
+PR #1 is READY_FOR_REVIEW after final clean-worktree qualification and push;
+merging is not authorized. DESIGN_CHANGE_REQUIRED: NONE.
+
+## Historical qualification — 2026-09-16
 
 Windows requalification was executed on 2026-09-16 from the authorized starting
 HEAD `f92f2547b7d504c173a2cc9bf652e9f5c7a8e679`, with the bounded fixes in this

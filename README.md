@@ -8,13 +8,16 @@ foreground commands, and multiple independent sessions.
 Read [the CP-0 local contract](docs/CP0_CONTRACT.md),
 [the CP-1 qualification report](docs/CP1_REPORT.md), and
 [the CP-2..CP-5 report](docs/CP2_CP5_REPORT.md) before use.
-CP-1 remains **BLOCKED** by the known node-pty/ConPTY cleanup `AttachConsole failed`
-diagnostic; CP-2..CP-5 Windows qualification is therefore not claimed as PASS.
+CP-1 and CP-2..CP-5 pass strict Windows qualification with the repository-maintained
+[node-pty lifecycle patch](patches/node-pty-1.1.0/README.md). Relay, MCP and ChatGPT
+end-to-end operation are not implemented; this is not yet MVP COMPLETE.
 
 ## Run
 
 Use a non-Administrator PowerShell 7 on Windows 11, with Node.js 22+ and an
-already provisioned WSL2 Kali user. No machine setup or distro changes are made.
+already provisioned WSL2 Kali user. The native patch also requires Python 3,
+VS 2022 C++ Build Tools and a Windows SDK; see the patch build prerequisites.
+The qualified runtime is Node 24.15.0 on Windows 11 x64.
 
 ```powershell
 npm.cmd ci

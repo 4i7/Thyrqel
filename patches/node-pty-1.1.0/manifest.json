@@ -1,0 +1,25 @@
+{
+  "version": "1.1.0",
+  "files": [
+    {
+      "file": "lib/windowsPtyAgent.js",
+      "beforeSha256": "8636d16b38266112204061a22b135734177c242837982fd3a4055be726efa64a",
+      "afterSha256": "6f3e5fec258c72504c80d3472edd4eecc59dff8b7f4590a9ce4ff941f096a8c2"
+    },
+    {
+      "file": "lib/windowsConoutConnection.js",
+      "beforeSha256": "1440f70908fb1f55911ac8e936a1230f68a9c00c03096fcef6788eac6aad9d62",
+      "afterSha256": "6103a6ce4a180c884cc554c5e3e43785059102fe2d36279f244460582ebc6ddf"
+    },
+    {
+      "file": "lib/worker/conoutSocketWorker.js",
+      "beforeSha256": "3e4bac095ac3870c3248a7302f5d10217de625f30c32b7000fe48a34788e47ac",
+      "afterSha256": "ccdc9d797c67a3cfe7b18d73c39398791d2529b9383041946fa4fb8119b418ec"
+    },
+    {
+      "file": "src/win/conpty.cc",
+      "beforeSha256": "52c893b689ab3210c0961e2a6aa805a82350003767b21069b164926b5becd4e2",
+      "afterSha256": "55cede5809f7ed223e8dff37b6096ad56a9e661abba6ff34627f164ca20f037f"
+    }
+  ]
+}
