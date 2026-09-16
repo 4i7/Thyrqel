@@ -1,5 +1,10 @@
 # CP-2 through CP-5 local terminal core report
 
+Subsequent Windows execution: see [CP-2 Windows framing escalation](CP2_WINDOWS_ESCALATION.md).
+The historical NOT RUN statements below describe the original implementation run;
+the subsequent run reproduced the first PowerShell failure and is BLOCKED pending
+framing review. CP-2..CP-5 are not qualified.
+
 Date: 2026-09-16 (Asia/Tokyo)
 
 Design authority: `TerminalBridge_DESIGN_5505fab3.md`, SHA-256
