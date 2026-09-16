@@ -20,7 +20,7 @@ const detector = new CompletionDetector();
 detector.arm(framed.completionToken);
 const pipeResult = detector.accept(pipe.stdout ?? '');
 console.log('PIPE', JSON.stringify({ exit: pipe.status, error: pipe.error?.message,
-  stderr: Boolean(pipe.stderr), rs: pipe.stdout?.includes('\x1e'), us: pipe.stdout?.includes('\x1f'),
+  stderr: Boolean(pipe.stderr), printablePrefix: pipe.stdout?.includes(`TB1:${framed.completionToken}:`),
   completion: pipeResult.completion?.success === true }));
 if (pipe.error || pipe.status !== 0 || pipe.stderr || !pipeResult.completion?.success) {
   throw new Error('Pipe control failed; do not infer a PTY-only failure');
@@ -39,7 +39,6 @@ const manager = new SessionManager(new ProfileRegistry(profiles), {
       const match = /\$__tb_token='([a-f0-9]{24})'\+'([a-f0-9]{24})'/.exec(data);
       if (match) {
         capturedToken = match[1]! + match[2]!;
-        // A split nonce proves execution after the original cleanup, not input echo.
         data = data.slice(0, -1) + `; [Console]::Out.WriteLine('${postlude.slice(0, 24)}'+'${postlude.slice(24)}')\r`;
       }
       write(data);
@@ -52,12 +51,10 @@ try {
   manager.read(session.sessionId);
   raw = '';
   const result = await manager.step(session.sessionId, 'Write-Output OK', 5000);
-  const at = raw.indexOf(`TB1:${capturedToken}:`);
   console.log('PTY', JSON.stringify({ version: session.identity?.version, state: result.state,
     outputOK: /(?:\r?\n|\x1b\[m)OK\r?\n/.test(raw), postlude: raw.includes(postlude),
-    tokenBody: capturedToken.length === 48 && at >= 0,
-    rs: raw.includes('\x1e'), us: raw.includes('\x1f'),
-    expectedPrefix: raw.includes(`\x1eTB1:${capturedToken}:`) }));
+    printablePrefix: capturedToken.length === 48 && raw.includes(`TB1:${capturedToken}:`),
+    completion: result.state === 'ready' && result.success === true }));
   if (result.state !== 'ready' || result.success !== true) process.exitCode = 1;
 } finally {
   manager.shutdown();
