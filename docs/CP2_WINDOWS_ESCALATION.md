@@ -112,7 +112,14 @@ The existing persistent reserved descriptor is unchanged. The same printable gra
 
 ## Current status
 
-The contract fix is implemented on the PR branch. **Windows requalification has not yet been claimed.** Run:
+**PARTIAL / ESCALATION_REQUIRED (external lifecycle dependency)**, 2026-09-16.
+Framing requalification was run; the earlier framing escalation is resolved.
+Starting checkout and PR head both matched
+`f92f2547b7d504c173a2cc9bf652e9f5c7a8e679`, branch
+`cp2-cp5-local-terminal-core`, clean checkout at `C:/Users/4i7/Documents/Thyrqel`.
+The design hash was reverified. No unrelated OneDrive checkout changes were touched.
+
+Executed:
 
 ```powershell
 npm.cmd ci
@@ -122,6 +129,88 @@ npm.cmd run smoke:cp2-cp5
 node dist/tests/diagnose-completion.js
 ```
 
-Expected CP-2 qualification requires the real PowerShell ConPTY path and real WSL2 Bash path to complete using the new printable frame. CP-1 remains a separate blocker while the existing `AttachConsole failed` cleanup diagnostic is present.
+The real PowerShell result/persistence matrix, Bash framing/redirection matrix,
+Python REPL, long-running Ctrl+C and simultaneous Kali/Kali/PowerShell assertions
+all pass after the implementation correction below. Both strict parents still
+report **FAIL: child exit=0, stderr=true, timeout=false** on the final 1.1.0 stack.
+Build/unit tests: **23/23 PASS**. See [the full command status](CP2_CP5_REPORT.md).
 
-Do not proceed to CP-6 solely because the framing patch exists; first record the target-runtime results.
+### Ordinary defects corrected
+
+1. CP-4 smoke discarded output returned by `step`, then waited for the same bytes
+   again in `read`. It now searches the combined initial and subsequent output.
+2. Interactive Bash's default SIGINT disposition abandoned the wrapper input list
+   after Python's KeyboardInterrupt, so no postlude ran and ActiveStep remained
+   RUNNING. The wrapper now saves the previous INT trap, installs a temporary
+   handler, captures payload status, and restores the trap before completion.
+   Real PTY regression coverage proves status 130, control recovery, the next
+   transaction, and default/pre-existing trap restoration. No Windows signal API
+   is used. A payload deliberately replacing the control trap can still disrupt
+   framing under the same-shell-authority limitation.
+3. Completion diagnostic sampled its appended postlude witness before it arrived;
+   it now waits for that witness with a bounded deadline and fails if absent.
+4. The redirection test now creates/removes its own temporary file. The old
+   `/tmp/tb_cp2_redir` test artifact was removed after verifying its expected content.
+
+### Cleanup root cause and supported-path investigation
+
+**VERIFIED from installed source and standalone runtime:** node-pty 1.1.0's OS
+ConPTY `kill()` forks `_getConsoleProcessList()` and synchronously closes ConPTY
+without waiting for that helper. A single `spawn`/`kill`, with no Terminal Bridge
+code, reproduces `AttachConsole failed`. Duplicate application cleanup is therefore
+not necessary to reproduce the failure. Upstream has the same reported race in
+[microsoft/node-pty#952](https://github.com/microsoft/node-pty/issues/952).
+
+Removing the application's exit cleanup is not a safe fix: `onExit` fires, but the
+dependency's conout worker/server remains alive. Installed `windowsPtyAgent` closes
+the output socket on ordinary process exit without disposing that worker. In DLL
+mode its `kill()` schedules disposal only on a future data event; natural exit can
+already have closed that stream. There is no public IPty worker-disposal API.
+
+`tests/diagnose-lifecycle.ts` directly exercises the public node-pty API in bounded
+child processes. Each child must report PTY exit **and naturally terminate**, with
+zero stderr. Timeout/stderr/nonzero exit are failures, not suppressed outcomes.
+
+| node-pty / Node | OS close | OS exit without cleanup | OS exit + kill | DLL close | DLL exit | DLL exit + kill |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1.1.0 / 24.15.0 | stderr FAIL | timeout FAIL | stderr FAIL | timeout FAIL | timeout FAIL | timeout FAIL |
+| 1.1.0 / 22.23.2 | stderr FAIL | timeout FAIL | stderr FAIL | timeout FAIL | timeout FAIL | timeout FAIL |
+| 1.2.0-beta.15 / 24.15.0 | clean observation | timeout FAIL | clean observation | clean observation | timeout FAIL | timeout FAIL |
+
+The beta OS-path observations are **not an accepted fix**: inspection of its
+`conpty_console_list_agent.js` shows that it catches AttachConsole failures and
+returns an empty list. That would hide this failure rather than prove cleanup.
+Its DLL path avoids that helper, and CP-2..CP-5 passed once with it, but the CP-1
+strict parent timed out after all functional assertions passed. No beta/DLL
+change remains in the branch. No dependency source was patched.
+
+The Node 22 comparison used an npm-exec cached runtime, without replacing host
+Node or changing project dependencies. Its cache is ordinary npm-managed state
+under `C:/Users/4i7/AppData/Local/npm-cache/_npx/`. Build outputs remain ignored in
+`dist/`; no raw terminal transcript or temporary source experiment is retained.
+
+Reproduce the final dependency failure:
+
+```powershell
+npm.cmd run build
+node dist/tests/diagnose-lifecycle.js
+npm.cmd exec --yes --package=node@22.23.2 -- node dist/tests/diagnose-lifecycle.js
+```
+
+### Remaining boundary
+
+The failure is localized to node-pty lifecycle implementation with a minimal
+reproducer, and the available supported public-API/runtime/version corrections
+tested here do not satisfy both clean close and natural exit. Continuing would
+require a dependency lifecycle correction, not a parser/ActiveStep workaround.
+Recommended upstream review targets are `WindowsPtyAgent.kill`,
+`_getConsoleProcessList`, `_cleanUpProcess`, and `ConoutConnection.dispose`:
+enumerate while the console is still valid, and close worker/input/output resources
+deterministically on both close and natural exit. Qualification must also prove
+owned-process termination, not merely absence of a diagnostic.
+
+This meets the objective's external-component escalation condition. No semantic
+design change is established (**DESIGN_CHANGE_REQUIRED: NONE**). CP-1 is BLOCKED;
+CP-2..CP-5 have functional PASS evidence but remain PARTIAL under the strict gate.
+No merge, CP-6, MCP or Cloudflare work was performed. The requested fully qualified
+PR outcome is **not achieved**.

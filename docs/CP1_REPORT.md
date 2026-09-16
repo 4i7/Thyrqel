@@ -1,5 +1,11 @@
 # CP-1 Local PTY qualification report
 
+Current 2026-09-16 re-investigation: see
+[Windows lifecycle evidence](CP2_WINDOWS_ESCALATION.md#current-status).
+CP-1 remains BLOCKED after new standalone Node 22/24 and dependency-candidate
+tests. The original run below is historical; its scope/Git/prerelease statements
+do not describe the subsequent PR #1 implementation run.
+
 Date: 2026-09-16 (Asia/Tokyo). Overall implementation status: **PARTIAL**.
 
 **CP-1 Local PTY: BLOCKED** — stable node-pty cleanup qualification did not pass.

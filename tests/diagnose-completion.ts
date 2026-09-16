@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import * as nodePty from 'node-pty';
 import { SessionManager, ProfileRegistry, type Profile } from '../src/main.js';
 import { PowerShellCommandFramer } from '../src/session/command-framer.js';
@@ -51,11 +52,14 @@ try {
   manager.read(session.sessionId);
   raw = '';
   const result = await manager.step(session.sessionId, 'Write-Output OK', 5000);
+  // Completion may arrive before the instrumentation after wrapper cleanup.
+  const deadline = Date.now() + 5000;
+  while (!raw.includes(postlude) && Date.now() < deadline) await delay(10);
   console.log('PTY', JSON.stringify({ version: session.identity?.version, state: result.state,
     outputOK: /(?:\r?\n|\x1b\[m)OK\r?\n/.test(raw), postlude: raw.includes(postlude),
     printablePrefix: capturedToken.length === 48 && raw.includes(`TB1:${capturedToken}:`),
     completion: result.state === 'ready' && result.success === true }));
-  if (result.state !== 'ready' || result.success !== true) process.exitCode = 1;
+  if (result.state !== 'ready' || result.success !== true || !raw.includes(postlude)) process.exitCode = 1;
 } finally {
   manager.shutdown();
 }

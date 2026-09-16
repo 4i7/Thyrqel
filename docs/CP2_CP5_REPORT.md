@@ -15,6 +15,8 @@ Review verdict: **LOCAL_CONTRACT_FIX**. The semantic design invariants remain un
 - Encoded user-command payloads; the contiguous high-entropy completion token is not present in PTY input echo.
 - Bash persistent reserved control descriptor. It remains open for the shell lifetime, so completion framing still works after a payload executes `exec >/dev/null`.
 - Bash status and cwd capture; `exit`/shell replacement is resolved by PTY exit rather than fabricated completion.
+- Bash saves/restores its SIGINT trap around payload evaluation so foreground Ctrl+C
+  returns status 130 through the normal postlude instead of abandoning ActiveStep.
 - PowerShell transaction-local error observation and terminating-error catch.
 - PowerShell native-exit provenance uses a transaction sentinel for `$LASTEXITCODE` and restores the previous value when no native command updates it.
 - PowerShell payload execution is dot-sourced from a generated ScriptBlock so cwd, environment, variables and functions remain in the persistent shell scope.
@@ -80,9 +82,12 @@ Target Windows smoke includes:
 
 ## Qualification status
 
-The printable framing correction is implemented on PR #1 but **target Windows requalification is still required**. Do not infer PASS from the code change alone.
+Windows requalification was executed on 2026-09-16 from the authorized starting
+HEAD `f92f2547b7d504c173a2cc9bf652e9f5c7a8e679`, with the bounded fixes in this
+checkpoint. Runtime: Windows 11 build 26200, Node 24.15.0, PowerShell 7.6.5,
+node-pty 1.1.0, WSL2 Kali user aizel (uid 1000), interactive `/bin/bash`.
 
-Run on the operator Windows 11 host:
+Commands executed:
 
 ```powershell
 npm.cmd ci
@@ -92,15 +97,36 @@ npm.cmd run smoke:cp2-cp5
 node dist/tests/diagnose-completion.js
 ```
 
-CP-1 remains independently blocked by the existing node-pty/ConPTY cleanup diagnostic `AttachConsole failed`; the framing change does not suppress or reclassify it.
+| Check | Actual result |
+| --- | --- |
+| `npm.cmd ci` | PASS, exact 1.1.0 dependency graph restored |
+| `npm.cmd test` | PASS, 23/23 unit/fake tests and TypeScript build |
+| `npm.cmd run smoke` | FAIL, all functional assertions pass, but cleanup stderr fails the strict parent |
+| `npm.cmd run smoke:cp2-cp5` | FAIL, all CP-2..CP-5 functional assertions pass, child exit=0, stderr=true, timeout=false |
+| `node dist/tests/diagnose-completion.js` | Completion control/PTY observations pass; command exits 0 but cleanup emits stderr, so not clean qualification |
+
+The original CP-4 smoke lost output already returned by step; its polling helper
+now includes that initial output. The actual Bash interrupt bug was then fixed:
+SIGINT used to abort the whole evaluated input list, skipping completion. Real PTY
+regressions now require exitCode=130, a successful following transaction, restoration
+of the default trap and of an existing trap. The diagnostic now waits for its
+post-cleanup witness rather than sampling immediately when completion arrives.
+
+CP-1's external cleanup blocker was actively re-investigated using a standalone
+dependency probe on Node 22 and 24 and an updated node-pty candidate. See
+[the lifecycle evidence and escalation](CP2_WINDOWS_ESCALATION.md#current-status).
+No failing qualification has been waived. The experimental dependency/DLL changes
+were reverted; package.json, lockfile, and production launch options retain 1.1.0.
 
 ```text
 CP-1 Local PTY: BLOCKED
-CP-2 CommandFramer / Completion: FIX_IMPLEMENTED_REQUALIFICATION_PENDING
-CP-3 Interactive: PARTIAL
-CP-4 Long-running: PARTIAL
-CP-5 Multiple Sessions: PARTIAL
+CP-2 CommandFramer / Completion: PARTIAL (functional PASS; cleanup gate FAIL)
+CP-3 Interactive: PARTIAL (functional PASS; cleanup gate FAIL)
+CP-4 Long-running: PARTIAL (functional PASS; cleanup gate FAIL)
+CP-5 Multiple Sessions: PARTIAL (functional PASS; cleanup gate FAIL)
 CP-6 Relay: NOT STARTED
 ```
 
 No Cloudflare Worker, MCP server, relay, credentials, delivery receipt, mutation sequencing, request hashing, distributed dedup, fencing, admin broker, GUI, or CP-6+ implementation is included.
+
+PR #1 is not qualified for completion/merge. DESIGN_CHANGE_REQUIRED: NONE.

@@ -14,15 +14,20 @@ export class BashCommandFramer implements CommandFramer {
       `if [ -z "\${__tb_fd+x}" ]; then exec {__tb_fd}>&1; fi`,
       `__tb_token='${a}''${b}'`,
       `__tb_payload='${payload}'`,
+      // Interactive Bash otherwise abandons the entire input list on SIGINT,
+      // skipping the completion postlude after an interrupted foreground command.
+      `__tb_int_trap=$(trap -p INT)`,
+      `trap ':' INT`,
       `eval "$(printf '%s' "$__tb_payload" | /usr/bin/base64 -d)"`,
       `__tb_status=$?`,
+      `if [ -n "$__tb_int_trap" ]; then eval "$__tb_int_trap"; else trap - INT; fi`,
       `__tb_cwd=$(builtin pwd -P)`,
       `__tb_cwd_b64=$(printf '%s' "$__tb_cwd" | /usr/bin/base64 -w0)`,
       `if [ "$__tb_status" -eq 0 ]; then __tb_ok=1; else __tb_ok=0; fi`,
       `printf -v __tb_body '%s:%s:%s:%s' '${op}' "$__tb_ok" "$__tb_status" "$__tb_cwd_b64"`,
       `printf -v __tb_len '%08x' "\${#__tb_body}"`,
       `printf 'TB1:%s:%s:%s' "$__tb_token" "$__tb_len" "$__tb_body" >&$__tb_fd`,
-      `unset __tb_token __tb_payload __tb_status __tb_cwd __tb_cwd_b64 __tb_ok __tb_body __tb_len`
+      `unset __tb_token __tb_payload __tb_status __tb_cwd __tb_cwd_b64 __tb_ok __tb_body __tb_len __tb_int_trap`
     ].join('; ') + '\r';
     return { wire, completionToken };
   }

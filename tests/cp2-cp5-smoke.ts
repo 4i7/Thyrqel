@@ -10,9 +10,10 @@ const ps = profiles.find(p => p.id === 'windows-pwsh');
 const kali = profiles.find(p => p.id === 'wsl-kali');
 if (!ps || !kali) throw new Error('CP-2..CP-5 smoke requires windows-pwsh and wsl-kali profiles');
 
-async function waitForOutput(id: string, needle: string, timeoutMs = 10000) {
+async function waitForOutput(id: string, needle: string, initialOutput = '', timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
-  let output = '';
+  let output = initialOutput;
+  if (output.includes(needle)) return output;
   while (Date.now() < deadline) {
     const read = manager.read(id);
     output += read.output;
@@ -39,9 +40,10 @@ async function waitForCompletion(id: string, timeoutMs = 10000) {
 
 async function expectReady(id: string, command: string, success: boolean, exitCode: number | null, contains?: string) {
   const result = await manager.step(id, command, 5000);
-  assert.equal(result.state, 'ready');
-  assert.equal(result.success, success);
-  assert.equal(result.exitCode, exitCode);
+  assert.equal(result.state, 'ready', command);
+  assert.equal(result.success, success, command);
+  assert.equal(result.exitCode, exitCode, command);
+  assert.equal(result.truncated, false, command);
   if (contains) assert.match(result.output, new RegExp(contains.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   return result;
 }
@@ -75,7 +77,7 @@ try {
     assert.match(pwd.output, /\/tmp/);
     await expectReady(s.sessionId, "printf '%s\\n' \"a'b\"", true, 0, "a'b");
     await expectReady(s.sessionId, "printf 'x\\n' | grep x", true, 0, 'x');
-    await expectReady(s.sessionId, "printf 'redir\\n' >/tmp/tb_cp2_redir; cat /tmp/tb_cp2_redir", true, 0, 'redir');
+    await expectReady(s.sessionId, "tb_test_file=$(mktemp); printf 'redir\\n' >\"$tb_test_file\"; cat \"$tb_test_file\"; rm -- \"$tb_test_file\"; unset tb_test_file", true, 0, 'redir');
     await expectReady(s.sessionId, "printf 'one\\n'\nprintf 'two\\n'", true, 0, 'two');
     await expectReady(s.sessionId, "cat <<'TBEOF'\nheredoc-ok\nTBEOF", true, 0, 'heredoc-ok');
     await expectReady(s.sessionId, 'if true; then echo compound-ok; fi', true, 0, 'compound-ok');
@@ -106,10 +108,27 @@ try {
     const s = await manager.open('wsl-kali'); manager.read(s.sessionId);
     const running = await manager.step(s.sessionId, "python3 -c \"import time; print('TB_LONG_RUNNING', flush=True); time.sleep(30)\"", 150);
     assert.equal(running.state, 'running');
-    await waitForOutput(s.sessionId, 'TB_LONG_RUNNING');
+    assert.equal(running.truncated, false);
+    await waitForOutput(s.sessionId, 'TB_LONG_RUNNING', running.output);
     manager.write(s.sessionId, { mode: 'key', key: 'CTRL_C' });
     const interrupted = await waitForCompletion(s.sessionId);
     assert.ok('success' in interrupted && interrupted.success === false);
+    assert.equal('exitCode' in interrupted ? interrupted.exitCode : undefined, 130);
+    await expectReady(s.sessionId, 'echo CONTROL_RECOVERED', true, 0, 'CONTROL_RECOVERED');
+    manager.write(s.sessionId, { mode: 'line', data: `if [ -z "$(trap -p INT)" ]; then printf '%s%s\\n' TB_TRAP_ DEFAULT_OK; fi` });
+    await waitForOutput(s.sessionId, 'TB_TRAP_DEFAULT_OK');
+
+    // A pre-existing shell trap must be restored after the temporary wrapper handler.
+    manager.write(s.sessionId, { mode: 'line', data: `trap 'TB_EXISTING_TRAP=kept' INT; printf '%s%s\\n' TB_TRAP_ SET` });
+    await waitForOutput(s.sessionId, 'TB_TRAP_SET');
+    const again = await manager.step(s.sessionId, "python3 -c \"import time; print('TRAP_RUN', flush=True); time.sleep(30)\"", 150);
+    assert.equal(again.state, 'running');
+    await waitForOutput(s.sessionId, 'TRAP_RUN', again.output);
+    manager.write(s.sessionId, { mode: 'key', key: 'CTRL_C' });
+    const againDone = await waitForCompletion(s.sessionId);
+    assert.equal('exitCode' in againDone ? againDone.exitCode : undefined, 130);
+    manager.write(s.sessionId, { mode: 'line', data: `printf '%s%s:%s\\n' TB_TRAP_ RESTORED "$(trap -p INT)"` });
+    await waitForOutput(s.sessionId, "TB_TRAP_RESTORED:trap -- 'TB_EXISTING_TRAP=kept' SIGINT");
     console.log('PASS CP-4 long-running / Ctrl+C');
     manager.close(s.sessionId); manager.forget(s.sessionId);
   }
