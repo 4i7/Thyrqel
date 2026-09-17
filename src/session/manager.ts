@@ -3,12 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { release } from 'node:os';
 import * as nodePty from 'node-pty';
 import { ProfileRegistry, launch } from '../profiles.js';
-import { TerminalError } from '../types.js';
+import { TerminalError, type TerminalWriteInput } from '../types.js';
 import { PtySession } from './pty-session.js';
 
 export function assertStandardWindowsHost() {
   if (process.platform !== 'win32' || Number(release().split('.')[2]) < 22000) throw new TerminalError('UNSUPPORTED_HOST', 'Windows 11 required');
-  // whoami reports the token integrity SID even when localized. Reject high/system integrity.
   const groups = execFileSync(`${process.env.SystemRoot}\\System32\\whoami.exe`, ['/groups', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true });
   const levels = [...groups.matchAll(/S-1-16-(\d+)/g)].map(m => Number(m[1]));
   if (levels.length !== 1 || levels[0]! >= 12288) throw new TerminalError('UNSUPPORTED_HOST', 'A non-elevated Windows token is required');
@@ -29,7 +28,6 @@ export class SessionManager {
   async open(profileId: string) {
     if (this.disposed) throw new TerminalError('SESSION_NOT_READY', 'Manager has shut down');
     const profile = this.registry.get(profileId);
-    // Bound retained entries as well as live PTYs. Explicit forget removes terminal records.
     if (this.sessions.size >= (this.options.maxSessions ?? 4)) throw new TerminalError('SESSION_LIMIT', 'Session registry full; forget closed/exited sessions');
     const spec = launch(profile);
     let pty: nodePty.IPty;
@@ -55,7 +53,8 @@ export class SessionManager {
     if (!s) throw new TerminalError('INVALID_SESSION', 'Unknown session');
     return s;
   }
-  write(id: string, text: string) { this.get(id).write(text); }
+  step(id: string, command: string, timeoutMs = 30000) { return this.get(id).step(command, timeoutMs); }
+  write(id: string, input: string | TerminalWriteInput) { return this.get(id).write(input); }
   read(id: string) { return this.get(id).read(); }
   close(id: string) { return this.get(id).close(); }
   forget(id: string) {

@@ -1,5 +1,45 @@
 # CP-1 Local PTY qualification report
 
+## Current qualification — 2026-09-17
+
+**CP-1: PASS.** The repository-maintained node-pty 1.1.0 lifecycle correction
+passes the original strict smoke parent: child exit=0, stderr=false, timeout=false.
+PowerShell 7 and WSL2 Kali readiness, persistent cwd, basic I/O, explicit/double
+close, and natural shell exit all pass on the actual Windows host.
+
+**VERIFIED root cause:** upstream close races its console-list helper against
+ClosePseudoConsole; natural exit removes the native baton before JS can release
+HPCON and leaves worker resources alive. This is independent of Terminal Bridge.
+The correction retains native ownership until close, waits for process exit plus
+output EOF, and closes every worker-owned resource. See the [patch contract and
+provenance](../patches/node-pty-1.1.0/README.md).
+
+Verification: npm ci PASS; npm test 26/26 PASS; both smoke parents PASS;
+completion diagnostic PASS; lifecycle diagnostic OS/DLL close, natural exit,
+post-exit cleanup and 15 repeated cycles per backend PASS. Each repeated run
+checks 3,000 tail lines before onExit, actual shell/attached child termination,
+worker/pipe cleanup, and Windows handle count after warmup. Observed handle
+baseline=220, subsequent samples=[220,220,220,220] for both backends.
+No stderr suppression, forced successful exit, or gate relaxation is used.
+
+Runtime: Windows 11 build 26200, Node 24.15.0, PowerShell **7.6.5** (observed),
+WSL2 Kali aizel/uid 1000, interactive /bin/bash. Build: Python 3.12.10,
+VS 2022 17.14.37314.3, MSVC 14.44.35207, SDK 10.0.26100.0.
+Patched Node 22 and other hosts are NOT RUN, not implied by the engine range.
+
+Git: existing PR #1 / cp2-cp5-local-terminal-core, based on
+14fca69bf24e98dc2bc1853bfd0d723e46241b4f. CP-6/MCP/ChatGPT E2E are NOT STARTED;
+this is qualified local core, not MVP COMPLETE. DESIGN_CHANGE_REQUIRED: NONE.
+Ignored profiles.local.json remains operator configuration; node_modules/dist
+are generated. The external build-tools cache above contains the verified VSIX
+and extracted libraries needed for reproducible native builds, not hidden source.
+The separate OneDrive checkout is unchanged.
+
+## Historical failed baseline (superseded)
+
+The following is the original CP-1 record. Its blocker, scope and Git statements
+describe that earlier checkpoint, not the current qualification above.
+
 Date: 2026-09-16 (Asia/Tokyo). Overall implementation status: **PARTIAL**.
 
 **CP-1 Local PTY: BLOCKED** — stable node-pty cleanup qualification did not pass.

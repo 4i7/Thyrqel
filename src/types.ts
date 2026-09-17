@@ -1,4 +1,5 @@
 export type SessionState = 'CREATING' | 'READY' | 'EXITED' | 'CLOSED' | 'FAILED';
+export type ActiveStepState = 'FRAMING' | 'DISPATCHED' | 'RUNNING' | 'COMPLETED' | 'EXITED' | 'FAILED' | 'CANCELLED';
 export type Profile = Readonly<
   { id: 'windows-pwsh'; platform: 'windows'; shellDialect: 'powershell'; command: string } |
   { id: 'wsl-kali'; platform: 'wsl2'; shellDialect: 'bash'; distro: string; user: string;
@@ -6,7 +7,7 @@ export type Profile = Readonly<
 >;
 export type ErrorCode = 'INVALID_PROFILE' | 'INVALID_SESSION' | 'SESSION_NOT_READY' |
   'PROFILE_START_FAILED' | 'PROFILE_IDENTITY_MISMATCH' | 'SESSION_IO_FAILED' |
-  'SESSION_LIMIT' | 'UNSUPPORTED_HOST';
+  'SESSION_LIMIT' | 'UNSUPPORTED_HOST' | 'SESSION_BUSY' | 'SESSION_PROTOCOL_ERROR';
 export class TerminalError extends Error {
   constructor(public readonly code: ErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
@@ -21,6 +22,34 @@ export interface Identity {
   cwd: string;
   interactive?: boolean;
 }
-// CP-2 connects at the raw onData boundary, before output storage/projection.
-export interface CompletionDetector { accept(raw: string): void; }
-export interface CommandFramer { frame(command: string): string; }
+export interface CompletionResult {
+  operationId: string;
+  success: boolean;
+  exitCode: number | null;
+  cwd: string;
+}
+export interface CompletionDetector {
+  arm(completionToken: string): void;
+  accept(raw: string): { output: string; completion?: CompletionResult };
+  flush(): string;
+  reset(): void;
+}
+export interface FramedCommand {
+  wire: string;
+  completionToken: string;
+}
+export interface CommandFramer { frame(command: string, operationId: string): FramedCommand; }
+export type TerminalKey = 'CTRL_C' | 'CTRL_D' | 'ENTER' | 'TAB' | 'ESC' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
+export type TerminalWriteInput =
+  | { mode: 'raw'; data: string }
+  | { mode: 'line'; data: string }
+  | { mode: 'key'; key: TerminalKey };
+export interface StepResult {
+  state: 'ready' | 'running' | 'exited' | 'closed';
+  success: boolean | null;
+  exitCode: number | null;
+  output: string;
+  truncated: boolean;
+  droppedBytes: number;
+  operationId: string;
+}

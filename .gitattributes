@@ -1,0 +1,2 @@
+# Patch hashes describe exact upstream/replacement bytes, including line endings.
+patches/node-pty-1.1.0/* -text
