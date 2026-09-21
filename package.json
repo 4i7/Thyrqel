@@ -3,12 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
+    "postinstall": "node scripts/patch-node-pty.mjs",
+    "mcp": "node dist/src/mcp/stdio.js",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "smoke": "npm run build && node dist/tests/qualify.js"
   },
-  "dependencies": { "node-pty": "1.1.0" },
-  "devDependencies": { "@types/node": "24.10.1", "typescript": "5.9.3" }
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "node-pty": "1.1.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
 }
