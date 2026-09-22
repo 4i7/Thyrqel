@@ -24,6 +24,13 @@ const secureHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'",
 };
+const consentHeaders = (redirectUri: string) => ({
+  ...secureHeaders,
+  // Chromium applies form-action across the redirect chain of a form submission.
+  // The downstream redirect URI was already validated against the registered client,
+  // so allow exactly its origin in addition to Thyrqel and GitHub.
+  'Content-Security-Policy': `default-src 'none'; form-action 'self' https://github.com ${new URL(redirectUri).origin}; frame-ancestors 'none'; base-uri 'none'`,
+});
 const cookie = (value: string, maxAge = 600) => `${cookieName}=${value}; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 const escape = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const error = (message: string, status = 400) => new Response(message, { status, headers: secureHeaders });
@@ -82,7 +89,7 @@ export async function handleAuthorization(request: Request, config: AuthConfig,
 <p>This client will be able to read terminal output and send commands to your Windows and WSL sessions, with your operating-system permissions.</p>
 <p>Only the configured GitHub account can authorize access. Continue only if you initiated this connection.</p>
 <form method="post" action="/authorize"><input type="hidden" name="state" value="${id}"><button type="submit">Continue with GitHub</button></form></html>`;
-      return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': cookie(id) } });
+      return new Response(html, { headers: { ...consentHeaders(auth.redirectUri), 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': cookie(id) } });
     }
     if (url.pathname === '/authorize' && request.method === 'POST') {
       // Origin is defense-in-depth. Privacy-focused/embedded browser contexts may
