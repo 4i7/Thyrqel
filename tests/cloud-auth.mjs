@@ -39,10 +39,11 @@ try {
   assert.equal(page.status, 200, await page.clone().text());
   const cookie = page.headers.get('Set-Cookie').split(';')[0];
   const state = cookie.split('=')[1];
-  // Exercise the deployed browser boundary: privacy-focused clients may omit
-  // Origin on a same-origin form POST, while the __Host cookie + state still bind consent.
+  // Exercise the deployed browser boundary: embedded/privacy-focused clients can
+  // serialize an opaque form-post origin as "null"; cookie + state still bind consent.
   const consent = await dispatch('/authorize', { method: 'POST', headers: { Cookie: cookie,
-    'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ state }).toString() });
+    Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ state }).toString() });
   assert.equal(consent.status, 302);
   const callback = `/callback?state=${state}&code=test-github-code`;
   const approved = await dispatch(callback, { headers: { Cookie: cookie } });
