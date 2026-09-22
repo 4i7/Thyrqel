@@ -45,6 +45,10 @@ try {
     Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ state }).toString() });
   assert.equal(consent.status, 302);
+  const consentRetry = await dispatch('/authorize', { method: 'POST', headers: { Cookie: cookie,
+    Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ state }).toString() });
+  assert.equal(consentRetry.status, 302);
   const callback = `/callback?state=${state}&code=test-github-code`;
   const approved = await dispatch(callback, { headers: { Cookie: cookie } });
   assert.equal(approved.status, 302, `${await approved.clone().text()} (upstream calls: ${githubCalls})`);
