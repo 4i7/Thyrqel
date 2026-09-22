@@ -85,8 +85,12 @@ https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-github-oauth
 ## Local password input
 
 Run the device in an interactive local terminal. Use `sessions` to identify the
-session, then `secret <sessionId>`. Verify that the intended trusted program is
-waiting for its password before typing. Input is hidden, Enter sends one line,
+session, then `secret <sessionId>`. If only one ready session has a profile,
+`secret wsl-kali` or `secret windows-pwsh` selects it without copying its long
+ID. If several sessions share a profile, use the exact ID shown by `sessions`.
+After restarting the device, old session IDs no longer exist. Verify that the
+intended trusted program is waiting for its password before typing. Input is
+hidden, Enter sends one line,
 and Ctrl+C stops the device without submitting the unfinished value. The console
 has no command history. Redirected stdin does not enable this console.
 
