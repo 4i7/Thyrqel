@@ -26,9 +26,12 @@ export class OutputRing {
       this.append('\uFFFD');
     }
   }
-  read() {
-    const result = { output: this.buffer.toString('utf8'), truncated: this.dropped > 0, dropped_bytes: this.dropped };
-    this.buffer = Buffer.alloc(0);
+  read(maxBytes = this.capacity) {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 4) throw new RangeError('read size must be >= 4');
+    let end = Math.min(this.buffer.length, maxBytes);
+    while (end < this.buffer.length && (this.buffer[end]! & 0xc0) === 0x80) end--;
+    const result = { output: this.buffer.subarray(0, end).toString('utf8'), truncated: this.dropped > 0, dropped_bytes: this.dropped };
+    this.buffer = Buffer.from(this.buffer.subarray(end));
     this.dropped = 0;
     return result;
   }

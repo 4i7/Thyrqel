@@ -31,6 +31,17 @@ test('readiness accepts every split and rejects input echo', () => {
     assert.equal(r.accept(value.slice(at))?.version, '7.6.5');
   }
 });
+
+test('bounded reads retain unread output and never split UTF-8 code points', () => {
+  const ring = new OutputRing(32);
+  ring.append('a😀日本語z');
+  assert.equal(ring.read(4).output, 'a');
+  assert.equal(ring.read(4).output, '😀');
+  assert.equal(ring.read(4).output, '日');
+  assert.equal(ring.read().output, '本語z');
+  assert.equal(ring.read().output, '');
+  assert.throws(() => ring.read(1), RangeError);
+});
 test('output preserves Unicode surrogate pairs across onData chunks', () => {
   const ring = new OutputRing(4);
   ring.append('\uD83D');
@@ -96,6 +107,19 @@ test('manager lifecycle, exit, late events and invalid handles', async () => {
   assert.throws(() => m.read(s.sessionId), { code: 'INVALID_SESSION' });
   m.shutdown();
   await assert.rejects(m.open('windows-pwsh'), { code: 'SESSION_NOT_READY' });
+});
+
+test('operator-provided child environment is snapshotted at the PTY spawn boundary', async () => {
+  const f = fake('success');
+  const environment: NodeJS.ProcessEnv = { PATH: 'trusted-path' };
+  let observed: unknown;
+  const m = new SessionManager(new ProfileRegistry([ps]), { environment, checkHost() {},
+    spawn: (_file, _args, options) => { observed = options?.env; return f.pty; } });
+  environment.DEVICE_TOKEN = 'must-not-appear';
+  try {
+    await m.open('windows-pwsh');
+    assert.deepEqual(observed, { PATH: 'trusted-path' });
+  } finally { m.shutdown(); }
 });
 test('startup timeout, early exit and identity mismatch kill unpublished PTY', async () => {
   for (const mode of ['timeout', 'exit', 'bad'] as const) {
