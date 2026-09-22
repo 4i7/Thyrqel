@@ -121,6 +121,23 @@ test('operator-provided child environment is snapshotted at the PTY spawn bounda
     assert.deepEqual(observed, { PATH: 'trusted-path' });
   } finally { m.shutdown(); }
 });
+test('local secret input registers redaction before synchronous PTY echo and final output', async () => {
+  const f = fake('success');
+  const m = new SessionManager(new ProfileRegistry([ps]), { spawn: () => f.pty, checkHost() {} });
+  try {
+    const { sessionId } = await m.open(ps.id);
+    m.read(sessionId);
+    f.pty.write = value => { const text = value.toString(); f.emit(text.slice(0, 3)); f.emit(text.slice(3)); };
+    m.writeSecret(sessionId, 'example-secret');
+    assert.equal(m.read(sessionId).output, '[REDACTED]\r');
+    f.emit('example-');
+    assert.equal(m.read(sessionId).output, '');
+    f.exit();
+    assert.equal(m.read(sessionId).output, '[REDACTED]');
+    f.emit('secret');
+    assert.equal(m.read(sessionId).output, '');
+  } finally { m.shutdown(); }
+});
 test('startup timeout, early exit and identity mismatch kill unpublished PTY', async () => {
   for (const mode of ['timeout', 'exit', 'bad'] as const) {
     const f = fake(mode);

@@ -2,6 +2,7 @@ import type { IPty, IDisposable } from 'node-pty';
 import { TerminalError, type Identity, type Profile, type SessionState, type CompletionDetector } from '../types.js';
 import { OutputRing } from './output-ring.js';
 import { Readiness } from './readiness.js';
+import { SecretRedactor } from './secret-redactor.js';
 
 export class PtySession {
   state: SessionState = 'CREATING';
@@ -13,6 +14,7 @@ export class PtySession {
   readonly ready: Promise<void>;
   private readonly output: OutputRing;
   private readonly subscriptions: IDisposable[] = [];
+  private readonly secrets = new SecretRedactor();
   private timer?: ReturnType<typeof setTimeout>;
   private rejectReady!: (error: Error) => void;
   constructor(readonly sessionId: string, readonly profile: Profile, private readonly pty: IPty,
@@ -23,7 +25,7 @@ export class PtySession {
       this.rejectReady = reject;
       this.timer = setTimeout(() => this.fail(new TerminalError('PROFILE_START_FAILED', 'Readiness timed out')), timeout);
       this.subscriptions.push(pty.onData(raw => {
-        if (this.state === 'CLOSED' || this.state === 'FAILED') return;
+        if (this.state === 'CLOSED' || this.state === 'FAILED' || this.state === 'EXITED') return;
         this.touch();
         try {
           if (this.state === 'CREATING') {
@@ -37,11 +39,12 @@ export class PtySession {
           } else {
             detector?.accept(raw);
           }
-          this.output.append(raw);
+          this.output.append(this.secrets.accept(raw));
         } catch (error) { this.fail(error instanceof Error ? error : new Error(String(error))); }
       }));
       this.subscriptions.push(pty.onExit(event => {
         this.exitCode = event.exitCode;
+        this.output.append(this.secrets.finish());
         this.output.finish();
         this.touch();
         if (this.state === 'CLOSED' || this.state === 'FAILED') return;
@@ -70,6 +73,7 @@ export class PtySession {
     this.failure = { code: error instanceof TerminalError ? error.code : 'SESSION_IO_FAILED', message: error.message };
     this.rejectReady(error);
     this.dispose();
+    this.output.append(this.secrets.finish());
     try { this.pty.kill(); } catch (cause) {
       // Retain cleanup failure explicitly, without masking the initiating error.
       error.cause = new AggregateError([error.cause, cause], 'PTY cleanup failed');
@@ -89,6 +93,12 @@ export class PtySession {
       throw error;
     }
   }
+  /** Local operator input only; intentionally absent from the MCP protocol. */
+  writeSecret(secret: string) {
+    if (this.state !== 'READY') throw new TerminalError('SESSION_NOT_READY', `Session is ${this.state}`);
+    this.secrets.add(secret);
+    this.write(secret + '\r');
+  }
   read(maxBytes?: number) { this.touch(); return { ...this.snapshot(), ...this.output.read(maxBytes) }; }
   close() {
     if (this.state === 'CLOSED') return this.snapshot();
@@ -98,6 +108,7 @@ export class PtySession {
     this.state = 'CLOSED';
     if (wasCreating) this.rejectReady(new TerminalError('PROFILE_START_FAILED', 'Closed before readiness'));
     this.dispose();
+    this.secrets.finish();
     if (!wasExited) {
       try { this.pty.kill(); }
       catch (cause) {

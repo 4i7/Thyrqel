@@ -7,6 +7,7 @@ import { SessionManager } from '../session/manager.js';
 import { DeviceExecutor } from './device-executor.js';
 import { runDeviceConnection } from './device-connection.js';
 import { shellEnvironment } from './environment.js';
+import { runOperatorConsole } from './operator-console.js';
 
 const configPath = resolve(process.argv[2] ?? join(process.env.LOCALAPPDATA ?? homedir(), 'Thyrqel', 'device.json'));
 const config = await (async () => {
@@ -24,7 +25,11 @@ const abort = new AbortController();
 process.once('SIGINT', () => abort.abort());
 process.once('SIGTERM', () => abort.abort());
 console.error(`Thyrqel device epoch: ${executor.epoch}`);
+const operator = runOperatorConsole(manager, abort).catch(() => {
+  console.error('Local operator console failed; stopping device');
+  abort.abort();
+});
 try {
   await runDeviceConnection(executor, config.endpoint, config.token, abort.signal,
     state => console.error(`Thyrqel device ${state}`));
-} finally { manager.shutdown(); }
+} finally { abort.abort(); await operator; manager.shutdown(); }
