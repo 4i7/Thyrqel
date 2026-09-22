@@ -88,11 +88,11 @@ lifecycle gate exited 0 with no stderr or timeout. The operator restarted the
 device; the public relay reported a new online epoch, and ChatGPT retrieved it
 through the existing OAuth connection. Unauthenticated `/mcp` and `/device`
 requests both returned HTTP 401.
+
 ## Remaining work before completion
 
 1. Qualify the reported disconnect/reconnect pattern over a sustained run,
    including a session and result spanning a transport interruption.
-
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
