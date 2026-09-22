@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { setImmediate as tick } from 'node:timers/promises';
+import { EventEmitter } from 'node:events';
 
 const source = readFileSync(new URL('../../node_modules/node-pty/lib/windowsPtyAgent.js', import.meta.url), 'utf8');
 const killSource = source.slice(source.indexOf('    WindowsPtyAgent.prototype.kill = function () {'),
@@ -50,4 +51,28 @@ test('natural exit only releases resources; enumeration failure is visible and n
   await tick();
   assert.deepEqual(failed.events, ['enumerate', 'native-release', 'worker-release', 'input-release', 'output-release']);
   assert.equal(failed.warnings.length, 1);
+});
+
+test('enumeration accepts an attach race only after native exit and rejects other failures', async () => {
+  const enumeration = source.slice(source.indexOf('    WindowsPtyAgent.prototype._getConsoleProcessList = function () {'),
+    source.indexOf('    Object.defineProperty(WindowsPtyAgent.prototype, "exitCode"'));
+  for (const [exitCode, message, expected] of [
+    [undefined, 'AttachConsole failed', 'reject'],
+    [0, 'AttachConsole failed', 'resolve'],
+    [0, 'Unexpected native failure', 'reject'],
+  ] as const) {
+    const helper = new EventEmitter();
+    const Agent = function () {};
+    let cleared = false;
+    runInNewContext(enumeration, { WindowsPtyAgent: Agent, __dirname: '.',
+      path: { join: () => 'helper' }, child_process_1: { fork: () => helper },
+      setTimeout: () => 1, clearTimeout: () => { cleared = true; } });
+    const agent = Object.assign(Object.create(Agent.prototype), { _innerPid: 42, _exitCode: exitCode });
+    const pending = agent._getConsoleProcessList();
+    helper.emit('message', { enumerationError: message });
+    if (expected === 'resolve') assert.equal((await pending).length, 0);
+    else await assert.rejects(pending, /ConPTY process enumeration failed/);
+    assert.equal(cleared, true);
+    helper.emit('exit', 1);
+  }
 });

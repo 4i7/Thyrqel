@@ -17,7 +17,8 @@
     "cloud:live": "npm run build && npm run cloud:build && node tests/qualify-cloud.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "smoke": "npm run build && node dist/tests/qualify.js"
+    "smoke": "npm run build && node dist/tests/qualify.js",
+    "lifecycle": "npm run build && node dist/tests/qualify.js --lifecycle"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "0.10.3",
