@@ -85,12 +85,12 @@ export async function handleAuthorization(request: Request, config: AuthConfig,
       return new Response(html, { headers: { ...secureHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': cookie(id) } });
     }
     if (url.pathname === '/authorize' && request.method === 'POST') {
-      // Origin is defense-in-depth. Privacy-focused browsers may omit it, so only
-      // reject an Origin when one is actually present and does not match.
-      // The consent remains bound to the browser by the __Host cookie plus the
-      // single-use server-side state below.
+      // Origin is defense-in-depth. Privacy-focused/embedded browser contexts may
+      // omit it or serialize an opaque origin as "null". Consent is still bound
+      // to this browser by the __Host cookie plus the single-use server-side state.
       const requestOrigin = request.headers.get('Origin');
-      if ((requestOrigin !== null && requestOrigin !== config.origin) ||
+      const acceptedOrigin = requestOrigin === null || requestOrigin === 'null' || requestOrigin === config.origin;
+      if (!acceptedOrigin ||
           !request.headers.get('Content-Type')?.startsWith('application/x-www-form-urlencoded')) return error('Invalid consent submission', 403);
       const form = new URLSearchParams(await readBoundedBody(request, 4096));
       const id = form.get('state');
