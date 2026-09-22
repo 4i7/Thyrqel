@@ -1,15 +1,10 @@
-# Cloudflare deployment preparation
+# Cloudflare deployment and operation
 
-Status: implemented and locally tested; **not deployed or ready for a completed
-ChatGPT connection**. The checked-in origin, OAuth client ID and KV ID are
-placeholders. Do not deploy them as production configuration.
+Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The final ChatGPT callback/device end-to-end path is still under qualification.
 
 The authenticated account lookup on 2026-09-22 returned account `4i7`
 (`abeba566977e67c1d9d7f46bd8654487`) and Workers subdomain `4i7`.
-The proposed production origin is `https://thyrqel.4i7.workers.dev`, with
-GitHub OAuth callback `https://thyrqel.4i7.workers.dev/callback`.
-The `thyrqel` Worker did not exist at the deployment lookup. These observations
-do not mean the endpoint has been provisioned or published.
+The production origin is `https://thyrqel.4i7.workers.dev`, with GitHub OAuth callback `https://thyrqel.4i7.workers.dev/callback`. The `thyrqel` Worker, `OAUTH_KV` binding, public vars and required Worker secrets have been provisioned. Re-deploying from the repository does not require re-registering the GitHub OAuth App or recreating Cloudflare resources.
 
 ## Architecture
 
@@ -42,18 +37,9 @@ discarding unread bytes; the underlying ring still reports overflow explicitly.
 An epoch change, capacity exhaustion or expired receipt requires operator
 reconciliation. Automated retirement of uncertain work is not implemented.
 
-## Configuration required before publication
+## Existing production configuration
 
-1. Verify the Cloudflare account and choose the final HTTPS Worker origin.
-2. Create the `OAUTH_KV` namespace; replace the placeholder ID.
-3. Register a GitHub OAuth App with that origin and callback `<origin>/callback`.
-   Set `GITHUB_CLIENT_ID`, and provision `GITHUB_CLIENT_SECRET` as a Worker secret.
-   `OWNER_GITHUB_ID` must match the operator's verified numeric GitHub account ID.
-4. Generate a random 32-byte device credential. Provision its hex SHA-256 as the
-   `DEVICE_TOKEN_SHA256` Worker secret. Keep the original credential only in the
-   operator's protected local configuration; never commit it or paste it in chat.
-5. Complete the remaining runtime/secret-input checks, then deploy and verify
-   authenticated end-to-end operation from the actual ChatGPT connector.
+The production Worker already has its origin, `OAUTH_KV` namespace, GitHub OAuth App client ID, owner GitHub ID, GitHub client secret, and device-token digest configured. Preserve these resources and secrets across deployments; do not recreate them as part of ordinary code updates. Complete the remaining runtime/secret-input and ChatGPT end-to-end checks against the existing deployment.
 
 The local device command is `npm.cmd run device`. By default it reads
 `%LOCALAPPDATA%/Thyrqel/device.json`, outside this OneDrive checkout. A different
