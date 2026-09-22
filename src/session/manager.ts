@@ -18,9 +18,11 @@ export class SessionManager {
   private readonly epoch = randomUUID();
   private readonly sessions = new Map<string, PtySession>();
   private disposed = false;
+  private readonly environment: NodeJS.ProcessEnv;
   constructor(private readonly registry: ProfileRegistry,
     private readonly options: { ringBytes?: number; readinessTimeoutMs?: number; maxSessions?: number;
-      spawn?: typeof nodePty.spawn; checkHost?: () => void } = {}) {
+      spawn?: typeof nodePty.spawn; checkHost?: () => void; environment?: NodeJS.ProcessEnv } = {}) {
+    this.environment = Object.freeze({ ...(options.environment ?? process.env) });
     for (const [value, minimum] of [[options.ringBytes ?? 1048576, 4], [options.readinessTimeoutMs ?? 15000, 1], [options.maxSessions ?? 4, 1]]) {
       if (!Number.isSafeInteger(value) || value! < minimum!) throw new RangeError('Invalid session limit');
     }
@@ -36,7 +38,7 @@ export class SessionManager {
     try {
       pty = (this.options.spawn ?? nodePty.spawn)(spec.command, spec.args, {
         name: 'xterm-256color', cols: 240, rows: 40, cwd: process.cwd(),
-        env: { ...process.env }, useConpty: true, handleFlowControl: false
+        env: { ...this.environment }, useConpty: true, handleFlowControl: false
       });
     } catch (cause) { throw new TerminalError('PROFILE_START_FAILED', 'PTY spawn failed', { cause }); }
     const id = `ts_${this.epoch}_${randomUUID()}`;
@@ -57,7 +59,7 @@ export class SessionManager {
   }
   write(id: string, text: string) { this.get(id).write(text); }
   list() { return [...this.sessions.values()].map(session => session.snapshot()); }
-  read(id: string) { return this.get(id).read(); }
+  read(id: string, maxBytes?: number) { return this.get(id).read(maxBytes); }
   close(id: string) { return this.get(id).close(); }
   forget(id: string) {
     const s = this.get(id);

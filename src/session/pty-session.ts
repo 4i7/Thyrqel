@@ -89,7 +89,7 @@ export class PtySession {
       throw error;
     }
   }
-  read() { this.touch(); return { ...this.snapshot(), ...this.output.read() }; }
+  read(maxBytes?: number) { this.touch(); return { ...this.snapshot(), ...this.output.read(maxBytes) }; }
   close() {
     if (this.state === 'CLOSED') return this.snapshot();
     const wasCreating = this.state === 'CREATING';

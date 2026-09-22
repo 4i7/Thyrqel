@@ -38,16 +38,22 @@ sudo failures were therefore not verified.
 - Raw input, subsequent reads, and terminal state kept distinct from completion.
 - Exact-version/hash node-pty lifecycle patch; diagnostics remain visible.
 - `npm ci`: PASS, including patch application; npm audit reported zero findings.
-- `npm test`: PASS, 14 tests, including SDK client/server protocol integration,
-  teardown-order regression tests, and an isolated operation journal.
-- Device-local operation journal implemented and unit-tested: duplicate pending
+- `npm test`: PASS, 23 tests, including SDK client/server protocol integration,
+  teardown order, OAuth handlers, bounded reads, environment separation and
+  reconnect/result recovery using real local WebSockets.
+- Device-local operation journal connected to the device executor: duplicate pending
   calls share execution, changed payloads conflict, result eviction leaves
-  no-resend tombstones, old process epochs are rejected. It is not yet wired
-  into a network transport. Input is hashed rather than retained by the journal.
+  no-resend tombstones, old process epochs are rejected. It is wired
+  to an outbound WebSocket transport. Input is hashed rather than retained by the journal.
 - `npm run smoke`: PASS after clean install, Windows PowerShell and WSL Kali,
   persistent cwd, interactive prompt/follow-up input, close, natural shell exit;
   child exit 0, no stderr, no timeout.
-- Actual sudo authentication / password entry: NOT RUN.
+- `cloud:check` and `cloud:test`: PASS for Worker types/build and local
+  OAuth/DO/MCP/WebSocket integration. GitHub and terminal peers are mocked.
+- `cloud:live`: PASS through local Workers to both real PTYs, including
+  interactive follow-up and clean natural host termination. GitHub is mocked.
+- `cloud:live -- --sudo`: FAIL. Observed sudo exit 1 and a password-required
+  diagnostic. Password-authenticated sudo remains NOT RUN; no OS policy changed.
 - Concurrent external exit and descendant-process lifecycle matrix: NOT RUN.
 
 The historical CP1 report remains unchanged as evidence of the earlier failed
@@ -55,21 +61,17 @@ baseline. The new basic smoke PASS does not qualify the unrun lifecycle matrix.
 
 ## Remaining work before completion
 
-1. Cloudflare OAuth endpoint with explicit operator consent and account binding.
-2. An outbound-only Windows device connection to a Durable Object relay, with
-   device credentials separated from child-shell environments.
-3. Operation IDs, connection epochs, bounded replay records, output receipts,
-   and unknown-outcome handling. Never resend uncertain input automatically.
-   The current local drain-read interface is insufficient for reliable remote
-   delivery and must not be exposed unchanged across an unreliable network.
-4. Secure local human input for credentials without putting passwords in MCP
+1. Provision the real GitHub OAuth App, Cloudflare KV, final origin and secrets.
+2. Qualify the implemented outbound relay and operation receipts on the actual
+   deployed Worker and ChatGPT connector. Local simulations are not public proof.
+3. Secure local human input for credentials without putting passwords in MCP
    arguments, relay storage, or diagnostic logs.
-5. Real lifecycle negatives and authenticated end-to-end ChatGPT verification.
-6. Concrete deployment configuration, account verification and release gates.
+4. Real lifecycle negatives, password-authenticated sudo, and final release gates.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. No Cloudflare
-resources or secrets have been created. Use the official OAuth provider library;
-authentication, consent, and device pairing still need implementation and tests.
+resources or secrets have been created. The official OAuth provider, consent,
+owner binding and device-credential verification are implemented and tested
+locally. See [Cloudflare setup](CLOUDFLARE_SETUP.md) for contracts and limitations.
 
 No cloud endpoint is deployed and no production-ready claim is made.

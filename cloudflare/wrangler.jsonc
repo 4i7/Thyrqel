@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "thyrqel",
+  "main": "index.ts",
+  "compatibility_date": "2026-09-21",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://thyrqel.example.invalid",
+    "OWNER_GITHUB_ID": "3959289",
+    "GITHUB_CLIENT_ID": ""
+  },
+  "secrets": { "required": ["GITHUB_CLIENT_SECRET", "DEVICE_TOKEN_SHA256"] },
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "BROKER", "class_name": "Broker" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Broker"] }],
+  "ratelimits": [{ "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }],
+  // OAuth callbacks contain codes; do not record full request URLs in logs.
+  "observability": { "enabled": false }
+}
