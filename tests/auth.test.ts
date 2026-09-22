@@ -48,9 +48,12 @@ function fixture(owner = 3959289) {
     const state = cookie.split('=')[1]!;
     return { page, cookie, state };
   }
-  const consent = (cookie: string, state: string, from = origin) => handle('/authorize', { method: 'POST',
-    headers: { Cookie: cookie, Origin: from, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ state }).toString() });
+  const consent = (cookie: string, state: string, from: string | null = origin) => {
+    const headers = new Headers({ Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' });
+    if (from !== null) headers.set('Origin', from);
+    return handle('/authorize', { method: 'POST', headers,
+      body: new URLSearchParams({ state }).toString() });
+  };
   return { handle, begin, consent, request, grants, calls, states };
 }
 
@@ -69,6 +72,22 @@ test('OAuth consent binds browser, enforces owner identity and never forwards th
   assert.ok(!JSON.stringify(f.grants).includes('upstream-secret'));
   assert.equal((await f.handle(callback, { headers: { Cookie: cookie } })).status, 403);
   assert.equal(f.calls.length, 2);
+});
+
+test('OAuth consent tolerates an omitted Origin while preserving cookie/state binding', async () => {
+  const omitted = fixture();
+  const ok = await omitted.begin();
+  assert.equal((await omitted.consent(ok.cookie, ok.state, null)).status, 302);
+
+  const noCookie = fixture();
+  const bound = await noCookie.begin();
+  assert.equal((await noCookie.consent('', bound.state, null)).status, 403);
+
+  const noFormType = fixture();
+  const typed = await noFormType.begin();
+  assert.equal((await noFormType.handle('/authorize', { method: 'POST',
+    headers: { Cookie: typed.cookie },
+    body: new URLSearchParams({ state: typed.state }).toString() })).status, 403);
 });
 
 test('OAuth rejects CSRF, unconsented callback, stale state, weak PKCE and other owners', async () => {
