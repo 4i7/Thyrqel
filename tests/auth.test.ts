@@ -64,7 +64,9 @@ test('OAuth consent binds browser, enforces owner identity and never forwards th
   assert.ok(html.includes('&lt;script&gt;bad()&lt;/script&gt;'));
   assert.ok(!html.includes('<script>'));
   assert.ok(page.headers.get('Set-Cookie')!.includes('Secure; HttpOnly; SameSite=Lax'));
-  assert.ok(page.headers.get('Content-Security-Policy')!.includes("form-action 'self' https://github.com"));
+  const csp = page.headers.get('Content-Security-Policy')!;
+  assert.ok(csp.includes("form-action 'self' https://github.com"));
+  assert.ok(csp.includes('https://client.example.test'));
   assert.equal((await f.consent(cookie, state)).status, 302);
   // Retrying the same browser-bound consent POST is safe and must simply
   // redirect to GitHub again until the callback atomically consumes the state.
