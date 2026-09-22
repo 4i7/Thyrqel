@@ -38,7 +38,7 @@ sudo failures were therefore not verified.
 - Raw input, subsequent reads, and terminal state kept distinct from completion.
 - Exact-version/hash node-pty lifecycle patch; diagnostics remain visible.
 - `npm ci`: PASS, including patch application; npm audit reported zero findings.
-- `npm test`: PASS, 23 tests, including SDK client/server protocol integration,
+- `npm test`: PASS, 28 tests, including SDK client/server protocol integration,
   teardown order, OAuth handlers, bounded reads, environment separation and
   reconnect/result recovery using real local WebSockets.
 - Device-local operation journal connected to the device executor: duplicate pending
@@ -64,8 +64,8 @@ baseline. The new basic smoke PASS does not qualify the unrun lifecycle matrix.
 1. Provision the real GitHub OAuth App, Cloudflare KV, final origin and secrets.
 2. Qualify the implemented outbound relay and operation receipts on the actual
    deployed Worker and ChatGPT connector. Local simulations are not public proof.
-3. Secure local human input for credentials without putting passwords in MCP
-   arguments, relay storage, or diagnostic logs.
+3. Manually qualify the implemented local hidden-input console with actual
+   password authentication. Synthetic real-PTY echo redaction is already PASS.
 4. Real lifecycle negatives, password-authenticated sudo, and final release gates.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser

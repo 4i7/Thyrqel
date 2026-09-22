@@ -58,6 +58,7 @@ export class SessionManager {
     return s;
   }
   write(id: string, text: string) { this.get(id).write(text); }
+  writeSecret(id: string, secret: string) { this.get(id).writeSecret(secret); }
   list() { return [...this.sessions.values()].map(session => session.snapshot()); }
   read(id: string, maxBytes?: number) { return this.get(id).read(maxBytes); }
   close(id: string) { return this.get(id).close(); }

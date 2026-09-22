@@ -86,11 +86,34 @@ retry an uncertain action.
   PASS with child exit 0, no stderr and no timeout; GitHub is mocked.
 - Real sudo authentication: NOT QUALIFIED. The `--sudo` check observed exit 1
   with `sudo: a password is required`; no sudo policy or password was changed.
-- Secure human secret entry: not implemented yet. Do not put passwords in model
-  tool arguments, which can be retained by clients.
+- Local hidden input and exact echo redaction: unit tests PASS; synthetic local
+  secrets through real PowerShell/WSL PTYs and remote result retrieval PASS.
+  Actual password-authenticated sudo and native console manual use remain unverified.
 - Real GitHub OAuth App, public Cloudflare endpoint, ChatGPT connection, and
   descendant/concurrent-exit PTY qualification: not complete.
 
 The OAuth flow follows the official Cloudflare GitHub OAuth example, with
 owner binding, atomic consent consumption and no upstream-token retention:
 https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-github-oauth
+
+## Local password input
+
+Run the device in an interactive local terminal. Use `sessions` to identify the
+session, then `secret <sessionId>`. Verify that the intended trusted program is
+waiting for its password before typing. Input is hidden, Enter sends one line,
+and Ctrl+C stops the device without submitting the unfinished value. The console
+has no command history. Redirected stdin does not enable this console.
+
+This path bypasses MCP arguments and operation journals. Exact matches are
+redacted before entering the PTY output ring, including matches split across
+chunks. A possible incomplete match is withheld until it can be resolved; at
+session termination it is replaced with `[REDACTED]`. Each session retains up to
+eight distinct values of 1–1024 characters without control characters. Redaction
+can also hide ordinary output matching those values and delay a matching suffix.
+
+The receiving program still obtains the secret. Transformed or deliberately
+exfiltrated output, arbitrary code running as the same OS user, and memory dumps
+are outside this protection. JavaScript strings cannot be reliably zeroed from
+memory. Do not enter a password into an untrusted program or a shell command
+prompt, and do not paste multiline content. No OS privilege or sudo policy is
+changed by this feature.

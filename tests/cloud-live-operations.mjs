@@ -66,6 +66,16 @@ export async function createLiveDevice() {
         await output(sessionId, 'TB_REMOTE_PROMPT');
         await call({ action: 'input', sessionId, text: 'follow-up-ok\r' });
         await output(sessionId, 'TB_REMOTE_ANSWER_follow-up-ok');
+        // Synthetic secret enters locally, never as a remote tool argument.
+        await call({ action: 'input', sessionId, text: ps
+          ? "$answer = Read-Host -Prompt ('TB_LOCAL_'+'SECRET'); Write-Output ('TB_SECRET_ECHO_'+$answer); Write-Output ('TB_SECRET_'+'DONE')\r"
+          : "printf '%s%s' 'TB_LOCAL_' 'SECRET'; read -r answer; printf 'TB_SECRET_ECHO_%s\\n' \"$answer\"; printf '%s%s\\n' 'TB_SECRET_' 'DONE'\r" });
+        await output(sessionId, 'TB_LOCAL_SECRET');
+        const syntheticSecret = `synthetic-${randomUUID()}`;
+        manager.writeSecret(sessionId, syntheticSecret);
+        const observedSecretOutput = await output(sessionId, 'TB_SECRET_DONE');
+        assert.ok(!observedSecretOutput.includes(syntheticSecret), 'Local secret must not appear in remote output');
+        assert.ok(observedSecretOutput.includes('TB_SECRET_ECHO_[REDACTED]'), 'Explicit echo must be redacted');
         if (!ps && requireSudo) {
           await call({ action: 'input', sessionId, text:
             "tb_uid=$(/usr/bin/sudo -n -- /usr/bin/id -u); tb_status=$?; printf '%s%s%s:%s\\n' 'TB_SU' 'DO_' \"$tb_status\" \"$tb_uid\"\r" });
@@ -78,7 +88,7 @@ export async function createLiveDevice() {
         }
         await call({ action: 'close', sessionId });
         await call({ action: 'forget', sessionId });
-        console.log(`PASS remote ${profile.id}: persistent cwd, interactive follow-up, close/forget`);
+        console.log(`PASS remote ${profile.id}: persistent cwd, interactive follow-up, local secret echo redaction, close/forget`);
       }
     },
   };

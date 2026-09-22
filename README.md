@@ -62,7 +62,10 @@ a line. Poll output separately and send follow-up input into the same session.
 command-name denylist; OS permissions remain in effect.
 
 Do not send passwords through model tool calls, which may be retained in client
-history. Secure human input for remote sessions is not implemented yet.
+history. In the device's local interactive console, use `sessions`, then
+`secret <sessionId>` to enter a hidden value directly into that PTY. Verify that
+the intended program is waiting for it. See the security limits in
+[Cloudflare setup](docs/CLOUDFLARE_SETUP.md#local-password-input).
 
 `npm ci` applies the [version-checked ConPTY lifecycle patch](docs/PTY_PATCH.md).
 Installing with `--ignore-scripts` does not produce a qualified runtime.
