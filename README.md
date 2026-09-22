@@ -43,8 +43,8 @@ try {
 The example is an API shape, not a complete interactive client. Applications
 must poll/read asynchronously and install their own shutdown handlers.
 The local stdio MCP server and Cloudflare relay are implemented. The cloud
-deployment and public MCP path have been exercised; the ChatGPT client flow
-remains under qualification. No GUI terminal,
+deployment and ChatGPT client flow have been exercised through the public MCP
+endpoint. No GUI terminal,
 WSL-side agent or privileged broker is introduced. Embedded local shells inherit
 an environment snapshot; the remote device uses an explicit shell environment
 allowlist to exclude agent/provider credentials.

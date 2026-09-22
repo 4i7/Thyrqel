@@ -1,6 +1,6 @@
 # Cloudflare deployment and operation
 
-Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The public MCP path has been exercised; the ChatGPT client flow is still under qualification.
+Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The ChatGPT client flow passed a public MCP status and Kali command test; sustained connection stability remains under qualification.
 
 The authenticated account lookup on 2026-09-22 returned account `4i7`
 (`abeba566977e67c1d9d7f46bd8654487`) and Workers subdomain `4i7`.
@@ -77,8 +77,9 @@ retry an uncertain action.
 - Local hidden input and exact echo redaction: unit tests PASS; synthetic local
   secrets through real PowerShell/WSL PTYs and remote result retrieval PASS.
   Native console password input and result retrieval were also verified.
-- Real GitHub OAuth and public Cloudflare MCP transport: PASS through the
-  attached connector. The ChatGPT client flow remains unqualified.
+- Real GitHub OAuth and public Cloudflare MCP transport: PASS. ChatGPT called
+  `device_status`, then opened a Kali session, read `pwd` as `/home/aizel`,
+  closed and forgot that test session through the owner-only OAuth connection.
 - Foreground-descendant and concurrent-exit PTY lifecycle gate: PASS on real
   PowerShell and WSL profiles. Detached-process and PID-reuse schedules remain
   outside this finite test.

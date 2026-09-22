@@ -38,7 +38,7 @@ sudo failures were therefore not verified.
 - Raw input, subsequent reads, and terminal state kept distinct from completion.
 - Exact-version/hash node-pty lifecycle patch; diagnostics remain visible.
 - `npm ci`: PASS, including patch application; npm audit reported zero findings.
-- `npm test`: PASS, 30 tests, including SDK client/server protocol integration,
+- `npm test`: PASS, 31 tests, including SDK client/server protocol integration,
   teardown order, OAuth handlers, bounded reads, environment separation and
   reconnect/result recovery using real local WebSockets.
 - Device-local operation journal connected to the device executor: duplicate pending
@@ -77,18 +77,23 @@ as designed. The browser's reported disconnect/reconnect cycle has not yet
 been classified as a sustained-connection PASS; a 50-second Worker tail showed
 no exceptions, which is insufficient to diagnose that cycle.
 
+On 2026-09-23, the operator's ChatGPT account connected its private Thyrqel MCP
+app using GitHub OAuth. ChatGPT invoked `device_status` against the public Worker,
+opened a new `wsl-kali` session, ran `pwd`, read `/home/aizel`, then closed and
+forgot only that test session. The device epoch stayed constant for this flow.
+
 ## Remaining work before completion
 
-1. Complete the actual ChatGPT callback qualification against the deployed Worker.
-2. Qualify the implemented outbound relay and operation receipts on the actual
-   deployed Worker and ChatGPT connector. Local simulations are not public proof.
-3. Qualify the reported disconnect/reconnect pattern over a sustained run,
+1. Qualify the reported disconnect/reconnect pattern over a sustained run,
    including a session and result spanning a transport interruption.
-4. Complete the actual ChatGPT connection and final release gates.
+2. Roll out the revised native patch and local password shortcut with the next
+   controlled device restart, then complete final release gates.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
 owner binding and device-credential verification are implemented and tested
 locally. See [Cloudflare setup](CLOUDFLARE_SETUP.md) for contracts and limitations.
 
-The production endpoint is deployed at `https://thyrqel.4i7.workers.dev`. End-to-end ChatGPT operation is still being qualified; deployment alone is not a production-ready claim.
+The production endpoint is deployed at `https://thyrqel.4i7.workers.dev`.
+ChatGPT end-to-end operation passed a bounded test; sustained reliability and
+the revised local patch remain to be qualified in production.
