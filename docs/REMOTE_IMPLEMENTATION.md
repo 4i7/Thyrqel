@@ -82,12 +82,17 @@ app using GitHub OAuth. ChatGPT invoked `device_status` against the public Worke
 opened a new `wsl-kali` session, ran `pwd`, read `/home/<local-user>`, then closed and
 forgot only that test session. The device epoch stayed constant for this flow.
 
+After PR #3 merged to GitHub `main` at `4c25a9c`, a clean install applied the
+revised native patch. The 31 tests passed, and the real PowerShell/WSL
+lifecycle gate exited 0 with no stderr or timeout. The operator restarted the
+device; the public relay reported a new online epoch, and ChatGPT retrieved it
+through the existing OAuth connection. Unauthenticated `/mcp` and `/device`
+requests both returned HTTP 401.
 ## Remaining work before completion
 
 1. Qualify the reported disconnect/reconnect pattern over a sustained run,
    including a session and result spanning a transport interruption.
-2. Roll out the revised native patch and local password shortcut with the next
-   controlled device restart, then complete final release gates.
+
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
@@ -95,5 +100,5 @@ owner binding and device-credential verification are implemented and tested
 locally. See [Cloudflare setup](CLOUDFLARE_SETUP.md) for contracts and limitations.
 
 The production endpoint is deployed at `https://thyrqel.4i7.workers.dev`.
-ChatGPT end-to-end operation passed a bounded test; sustained reliability and
-the revised local patch remain to be qualified in production.
+ChatGPT end-to-end operation and the revised native patch passed bounded
+production checks; sustained connection reliability remains under qualification.
