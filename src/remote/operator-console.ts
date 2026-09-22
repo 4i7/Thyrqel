@@ -18,7 +18,7 @@ export async function runOperatorConsole(manager: Pick<SessionManager, 'list' | 
   const terminal = createInterface({ input, output, terminal: true, historySize: 0 });
   terminal.on('SIGINT', () => abort.abort());
   terminal.on('close', () => abort.abort());
-  display.write('Local controls: sessions | secret <sessionId> | quit\n');
+  display.write('Local controls: sessions | secret <profile-or-sessionId> | quit\n');
   try {
     while (!abort.signal.aborted) {
       const command = (await terminal.question('device> ', { signal: abort.signal })).trim();
@@ -28,11 +28,16 @@ export async function runOperatorConsole(manager: Pick<SessionManager, 'list' | 
         continue;
       }
       const match = /^secret (\S+)$/.exec(command);
-      if (!match) { display.write('Use sessions, secret <sessionId>, or quit.\n'); continue; }
-      const sessionId = match[1]!;
-      if (!manager.list().some(session => session.sessionId === sessionId && session.state === 'READY')) {
-        display.write('Session is not ready.\n'); continue;
+      if (!match) { display.write('Use sessions, secret <profile-or-sessionId>, or quit.\n'); continue; }
+      const target = match[1]!;
+      const ready = manager.list().filter(session => session.state === 'READY' &&
+        (session.sessionId === target || session.profile === target));
+      if (ready.length !== 1) {
+        display.write(ready.length > 1 ? 'Multiple sessions match; run sessions and use an exact session ID.\n'
+          : 'No ready session matches; run sessions to see current IDs after a device restart.\n');
+        continue;
       }
+      const sessionId = ready[0]!.sessionId;
       display.write('Confirm the trusted program is waiting for a password in this session. Input is hidden; Enter sends it, Ctrl+C stops the device.\nSecret: ');
       muted = true;
       let secret = '';
