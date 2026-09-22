@@ -3,7 +3,7 @@
 Windows-side TypeScript library for persistent PowerShell 7 and WSL2 Kali PTYs.
 See [the local contract](docs/CP0_CONTRACT.md) and [qualification report](docs/CP1_REPORT.md)
 before use. See [the current implementation status](docs/REMOTE_IMPLEMENTATION.md)
-for qualification evidence and the remaining deployment work.
+for qualification evidence and the remaining end-to-end work.
 
 ## Run
 
