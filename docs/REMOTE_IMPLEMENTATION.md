@@ -61,7 +61,7 @@ baseline. The new basic smoke PASS does not qualify the unrun lifecycle matrix.
 
 ## Remaining work before completion
 
-1. Provision the real GitHub OAuth App, Cloudflare KV, final origin and secrets.
+1. Complete the actual ChatGPT callback qualification against the deployed Worker.
 2. Qualify the implemented outbound relay and operation receipts on the actual
    deployed Worker and ChatGPT connector. Local simulations are not public proof.
 3. Manually qualify the implemented local hidden-input console with actual
@@ -69,9 +69,8 @@ baseline. The new basic smoke PASS does not qualify the unrun lifecycle matrix.
 4. Real lifecycle negatives, password-authenticated sudo, and final release gates.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
-login. Account `4i7` is available with Workers/KV write permissions. No Cloudflare
-resources or secrets have been created. The official OAuth provider, consent,
+login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
 owner binding and device-credential verification are implemented and tested
 locally. See [Cloudflare setup](CLOUDFLARE_SETUP.md) for contracts and limitations.
 
-No cloud endpoint is deployed and no production-ready claim is made.
+The production endpoint is deployed at `https://thyrqel.4i7.workers.dev`. End-to-end ChatGPT operation is still being qualified; deployment alone is not a production-ready claim.
