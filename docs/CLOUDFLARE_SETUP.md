@@ -1,6 +1,6 @@
 # Cloudflare deployment and operation
 
-Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The final ChatGPT callback/device end-to-end path is still under qualification.
+Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The public MCP path has been exercised; the ChatGPT client flow is still under qualification.
 
 The authenticated account lookup on 2026-09-22 returned account `4i7`
 (`<cloudflare-account-id>`) and Workers subdomain `4i7`.
@@ -70,13 +70,18 @@ retry an uncertain action.
 - Node WebSocket reconnect with result replay and late result completion: PASS.
 - Local relay to real PowerShell/WSL PTYs, interactive follow-up and cleanup:
   PASS with child exit 0, no stderr and no timeout; GitHub is mocked.
-- Real sudo authentication: NOT QUALIFIED. The `--sudo` check observed exit 1
-  with `sudo: a password is required`; no sudo policy or password was changed.
+- The noninteractive `--sudo` check observed exit 1 with `sudo: a password is
+  required`. Password-authenticated sudo through the public MCP WSL session and
+  local hidden-input console returned UID 0 and exit status 0. No sudo policy or
+  password was changed.
 - Local hidden input and exact echo redaction: unit tests PASS; synthetic local
   secrets through real PowerShell/WSL PTYs and remote result retrieval PASS.
-  Actual password-authenticated sudo and native console manual use remain unverified.
-- Real GitHub OAuth App, public Cloudflare endpoint, ChatGPT connection, and
-  descendant/concurrent-exit PTY qualification: not complete.
+  Native console password input and result retrieval were also verified.
+- Real GitHub OAuth and public Cloudflare MCP transport: PASS through the
+  attached connector. The ChatGPT client flow remains unqualified.
+- Foreground-descendant and concurrent-exit PTY lifecycle gate: PASS on real
+  PowerShell and WSL profiles. Detached-process and PID-reuse schedules remain
+  outside this finite test.
 
 The OAuth flow follows the official Cloudflare GitHub OAuth example, with
 owner binding, atomic consent consumption and no upstream-token retention:
@@ -90,8 +95,8 @@ session, then `secret <sessionId>`. If only one ready session has a profile,
 ID. If several sessions share a profile, use the exact ID shown by `sessions`.
 After restarting the device, old session IDs no longer exist. Verify that the
 intended trusted program is waiting for its password before typing. Input is
-hidden, Enter sends one line,
-and Ctrl+C stops the device without submitting the unfinished value. The console
+hidden, Enter sends one line, and Ctrl+C stops the device without submitting
+the unfinished value. The console
 has no command history. Redirected stdin does not enable this console.
 
 This path bypasses MCP arguments and operation journals. Exact matches are
