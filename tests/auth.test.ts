@@ -21,7 +21,7 @@ function fixture(owner = 3959289) {
     async saveAuth(id, state) { states.set(id, state); return true; },
     async consentAuth(id) {
       const state = states.get(id);
-      if (!state || state.consented || state.expiresAt <= Date.now()) return false;
+      if (!state || state.expiresAt <= Date.now()) return false;
       state.consented = true;
       return true;
     },
@@ -65,6 +65,9 @@ test('OAuth consent binds browser, enforces owner identity and never forwards th
   assert.ok(!html.includes('<script>'));
   assert.ok(page.headers.get('Set-Cookie')!.includes('Secure; HttpOnly; SameSite=Lax'));
   assert.ok(page.headers.get('Content-Security-Policy')!.includes("form-action 'self' https://github.com"));
+  assert.equal((await f.consent(cookie, state)).status, 302);
+  // Retrying the same browser-bound consent POST is safe and must simply
+  // redirect to GitHub again until the callback atomically consumes the state.
   assert.equal((await f.consent(cookie, state)).status, 302);
   const callback = `/callback?state=${state}&code=github-code`;
   const response = await f.handle(callback, { headers: { Cookie: cookie } });
