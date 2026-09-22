@@ -5,13 +5,13 @@
   "compatibility_date": "2026-09-21",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "vars": {
-    "PUBLIC_ORIGIN": "https://thyrqel.example.invalid",
+    "PUBLIC_ORIGIN": "https://thyrqel.4i7.workers.dev",
     "OWNER_GITHUB_ID": "3959289",
-    "GITHUB_CLIENT_ID": ""
+    "GITHUB_CLIENT_ID": "Ov23liKkPh0IPhF42Izb"
   },
   "secrets": { "required": ["GITHUB_CLIENT_SECRET", "DEVICE_TOKEN_SHA256"] },
   "kv_namespaces": [
-    { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }
+    { "binding": "OAUTH_KV", "id": "e4629c6af345407d827554a6aa03849f" }
   ],
   "durable_objects": {
     "bindings": [{ "name": "BROKER", "class_name": "Broker" }]
