@@ -36,6 +36,13 @@ try {
     manager.write(s.sessionId, ps ? "Write-Output ('TB_PERSIST_'+ ((Get-Location).Path -eq $env:TEMP))\r" : "printf 'TB_PERSIST_%s\\n' \"$PWD\"\r");
     await waitOutput(s.sessionId, ps ? 'TB_PERSIST_True' : 'TB_PERSIST_/tmp');
     console.log(`PASS ${profile.id} persistent cwd (separate writes)`);
+    manager.write(s.sessionId, ps
+      ? "$tbAnswer = Read-Host -Prompt ('TB_INPUT_'+'WAIT'); Write-Output ('TB_ANSWER_'+$tbAnswer)\r"
+      : "printf '%s%s' 'TB_INPUT_' 'WAIT'; read -r tb_answer; printf 'TB_ANSWER_%s\\n' \"$tb_answer\"\r");
+    await waitOutput(s.sessionId, 'TB_INPUT_WAIT');
+    manager.write(s.sessionId, 'interactive-ok\r');
+    await waitOutput(s.sessionId, 'TB_ANSWER_interactive-ok');
+    console.log(`PASS ${profile.id} interactive prompt / follow-up input`);
     assert.equal(manager.close(s.sessionId).state, 'CLOSED');
     assert.equal(manager.close(s.sessionId).state, 'CLOSED');
     assert.throws(() => manager.write(s.sessionId, 'x'), { code: 'SESSION_NOT_READY' });

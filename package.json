@@ -3,12 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
+    "postinstall": "node scripts/patch-node-pty.mjs",
+    "mcp": "node dist/src/mcp/stdio.js",
+    "device": "node dist/src/remote/device-cli.js",
+    "cloud:types": "wrangler types --config cloudflare/wrangler.jsonc cloudflare/worker-configuration.d.ts",
+    "cloud:check": "npm run cloud:types && tsc -p cloudflare/tsconfig.json",
+    "cloud:build": "wrangler deploy --dry-run --config cloudflare/wrangler.jsonc --outdir ../dist/cloudflare",
+    "cloud:test": "npm run cloud:build && node tests/cloud-auth.mjs",
+    "cloud:live": "npm run build && npm run cloud:build && node tests/qualify-cloud.mjs",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "smoke": "npm run build && node dist/tests/qualify.js"
   },
-  "dependencies": { "node-pty": "1.1.0" },
-  "devDependencies": { "@types/node": "24.10.1", "typescript": "5.9.3" }
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "0.10.3",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "node-pty": "1.1.0",
+    "ws": "8.21.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/ws": "8.18.1",
+    "miniflare": "5.20260921.0-alpha",
+    "typescript": "5.9.3",
+    "wrangler": "4.136.1"
+  }
 }

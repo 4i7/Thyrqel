@@ -1,3 +1,7 @@
 node_modules/
 dist/
 profiles.local.json
+.wrangler/
+.dev.vars*
+device.local.json
+cloudflare/worker-configuration.d.ts
