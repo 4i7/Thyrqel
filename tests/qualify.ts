@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 
 // Qualification includes clean Agent termination, not just assertions inside it.
 // Timeout/stderr fail the gate; never use process.exit() inside smoke to hide handles.
-const child = spawn(process.execPath, [fileURLToPath(new URL('./smoke.js', import.meta.url)), ...process.argv.slice(2)], {
+const lifecycle = process.argv.includes('--lifecycle');
+const child = spawn(process.execPath, [fileURLToPath(new URL(lifecycle ? '../../tests/lifecycle.mjs' : './smoke.js', import.meta.url)),
+  ...process.argv.slice(2).filter(argument => argument !== '--lifecycle')], {
   stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true
 });
 let diagnostics = false;

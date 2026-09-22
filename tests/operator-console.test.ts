@@ -38,3 +38,37 @@ test('local console hides secret typing and history, and aborts without sending 
     } finally { abort.abort(); await running; input.destroy(); display.destroy(); }
   }
 });
+
+test('profile shortcut selects exactly one live session and refuses stale or ambiguous targets', async () => {
+  const input = Object.assign(new PassThrough(), { isTTY: true, setRawMode() {} });
+  const display = Object.assign(new PassThrough(), { isTTY: true });
+  let shown = '';
+  display.on('data', chunk => { shown += chunk.toString(); });
+  const sent: string[] = [];
+  const abort = new AbortController();
+  const sessions = [{ sessionId: 'current-1', profile: 'wsl-kali' as const, state: 'READY' as const,
+    createdAt: '', lastActivityAt: '', identity: undefined, exitCode: undefined, error: undefined }];
+  const running = runOperatorConsole({ list: () => sessions,
+    writeSecret: (id, secret) => { assert.equal(id, 'current-1'); sent.push(secret); },
+  }, abort, input as unknown as typeof process.stdin, display as unknown as typeof process.stdout);
+  try {
+    input.write('secret stale-id\r');
+    await setImmediate();
+    assert.ok(shown.includes('No ready session matches'));
+    sessions.push({ ...sessions[0]!, sessionId: 'current-2' });
+    input.write('secret wsl-kali\r');
+    await setImmediate();
+    assert.ok(shown.includes('Multiple sessions match'));
+    assert.ok(!shown.includes('Secret: '));
+    sessions.pop();
+    input.write('secret wsl-kali\r');
+    await setImmediate();
+    assert.ok(shown.includes('Secret: '));
+    input.write('synthetic-value\r');
+    await setImmediate();
+    input.write('quit\r');
+    await running;
+    assert.deepEqual(sent, ['synthetic-value']);
+    assert.ok(!shown.includes('synthetic-value'));
+  } finally { abort.abort(); await running; input.destroy(); display.destroy(); }
+});

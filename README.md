@@ -43,7 +43,8 @@ try {
 The example is an API shape, not a complete interactive client. Applications
 must poll/read asynchronously and install their own shutdown handlers.
 The local stdio MCP server and Cloudflare relay are implemented. The cloud
-deployment and real ChatGPT connection are not yet qualified. No GUI terminal,
+deployment and ChatGPT client flow have been exercised through the public MCP
+endpoint. No GUI terminal,
 WSL-side agent or privileged broker is introduced. Embedded local shells inherit
 an environment snapshot; the remote device uses an explicit shell environment
 allowlist to exclude agent/provider credentials.
@@ -63,7 +64,8 @@ command-name denylist; OS permissions remain in effect.
 
 Do not send passwords through model tool calls, which may be retained in client
 history. In the device's local interactive console, use `sessions`, then
-`secret <sessionId>` to enter a hidden value directly into that PTY. Verify that
+`secret <sessionId>` to enter a hidden value directly into that PTY. With one
+ready session for a profile, `secret wsl-kali` selects it. Verify that
 the intended program is waiting for it. See the security limits in
 [Cloudflare setup](docs/CLOUDFLARE_SETUP.md#local-password-input).
 
@@ -85,5 +87,6 @@ npm.cmd run cloud:live
 `cloud:test` runs real local Workers/DO/OAuth/MCP code with mocked GitHub and
 terminal peers. `cloud:live` connects that local relay to the configured real
 Windows/WSL PTYs; GitHub authentication is still mocked. Neither command deploys
-to Cloudflare. `cloud:live -- --sudo` additionally requires existing noninteractive
-sudo authorization and currently fails because this machine requires a password.
+to Cloudflare. `cloud:live -- --sudo` requires existing noninteractive sudo
+authorization; this machine requires a password. Password-authenticated sudo
+was instead verified through public MCP and the device's hidden-input console.
