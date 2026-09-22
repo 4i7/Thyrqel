@@ -64,6 +64,7 @@ test('OAuth consent binds browser, enforces owner identity and never forwards th
   assert.ok(html.includes('&lt;script&gt;bad()&lt;/script&gt;'));
   assert.ok(!html.includes('<script>'));
   assert.ok(page.headers.get('Set-Cookie')!.includes('Secure; HttpOnly; SameSite=Lax'));
+  assert.ok(page.headers.get('Content-Security-Policy')!.includes("form-action 'self' https://github.com"));
   assert.equal((await f.consent(cookie, state)).status, 302);
   const callback = `/callback?state=${state}&code=github-code`;
   const response = await f.handle(callback, { headers: { Cookie: cookie } });
