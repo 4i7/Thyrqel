@@ -37,8 +37,8 @@ export class Broker extends DurableObject<Env> {
   async consentAuth(id: string) {
     return this.ctx.storage.transaction(async tx => {
       const state = await tx.get<AuthState>(`auth:${id}`);
-      if (!state || state.expiresAt <= Date.now() || state.consented) return false;
-      await tx.put(`auth:${id}`, { ...state, consented: true });
+      if (!state || state.expiresAt <= Date.now()) return false;
+      if (!state.consented) await tx.put(`auth:${id}`, { ...state, consented: true });
       return true;
     });
   }
