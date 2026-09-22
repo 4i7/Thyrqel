@@ -80,6 +80,10 @@ test('OAuth consent tolerates an omitted Origin while preserving cookie/state bi
   const ok = await omitted.begin();
   assert.equal((await omitted.consent(ok.cookie, ok.state, null)).status, 302);
 
+  const opaque = fixture();
+  const opaqueBound = await opaque.begin();
+  assert.equal((await opaque.consent(opaqueBound.cookie, opaqueBound.state, 'null')).status, 302);
+
   const noCookie = fixture();
   const bound = await noCookie.begin();
   assert.equal((await noCookie.consent('', bound.state, null)).status, 403);
