@@ -52,8 +52,12 @@ sudo failures were therefore not verified.
   OAuth/DO/MCP/WebSocket integration. GitHub and terminal peers are mocked.
 - `cloud:live`: PASS through local Workers to both real PTYs, including
   interactive follow-up and clean natural host termination. GitHub is mocked.
-- `cloud:live -- --sudo`: FAIL. Observed sudo exit 1 and a password-required
-  diagnostic. Password-authenticated sudo remains NOT RUN; no OS policy changed.
+- `cloud:live -- --sudo`: the earlier noninteractive check failed because a
+  password was required. On 2026-09-23, the operator entered the Kali password
+  in the device's local hidden-input console while the public MCP WSL session
+  waited in `sudo -- id -u`; the terminal returned UID `0` and exit status `0`.
+  No sudo policy changed, and the password was absent from tool arguments and
+  terminal output.
 - `npm run lifecycle -- path/to/profiles.json`: PASS on Windows PowerShell and
   WSL Kali for foreground descendant cleanup, three immediate exit/close races
   per profile, and external termination of each test-owned host process. The
@@ -67,9 +71,8 @@ PID-reuse schedule.
 On 2026-09-23, the attached Thyrqel MCP connection to the public Worker reported
 an online device. Real PowerShell and WSL sessions accepted interactive input,
 retained their working directories and variables, returned follow-up output,
-and replayed completed receipts without a second effect. An actual WSL `sudo`
-invocation reached the password prompt; password-authenticated success remains
-unqualified. A device restart changed the epoch and retired that old session,
+and replayed completed receipts without a second effect. A device restart
+changed the epoch and retired that old session,
 as designed. The browser's reported disconnect/reconnect cycle has not yet
 been classified as a sustained-connection PASS; a 50-second Worker tail showed
 no exceptions, which is insufficient to diagnose that cycle.
@@ -79,9 +82,9 @@ no exceptions, which is insufficient to diagnose that cycle.
 1. Complete the actual ChatGPT callback qualification against the deployed Worker.
 2. Qualify the implemented outbound relay and operation receipts on the actual
    deployed Worker and ChatGPT connector. Local simulations are not public proof.
-3. Manually qualify the implemented local hidden-input console with actual
-   password authentication. Synthetic real-PTY echo redaction is already PASS.
-4. Password-authenticated sudo, session stability, and final release gates.
+3. Qualify the reported disconnect/reconnect pattern over a sustained run,
+   including a session and result spanning a transport interruption.
+4. Complete the actual ChatGPT connection and final release gates.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
