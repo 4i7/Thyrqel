@@ -104,16 +104,18 @@ tests passed; after merging to `main`, a real `quit` displayed
 `Thyrqel device stopping: local quit`. The device then reconnected from
 the merged build. The earlier silent exit remains unclassified.
 
+The device was then launched in a separate visible PowerShell window from the
+merged `main` build. Its PowerShell and Node processes remained alive, and
+the public relay reported the same online epoch on a later check. This
+independent interactive window supports local hidden password entry while it
+stays open; automatic start at Windows logon is not configured.
+
 ## Remaining work before completion
 
 1. Observe an actual production transport interruption with the device
    process and epoch retained; verify that an existing session and receipt
    remain usable after reconnect. Local WebSocket reconnect and result-replay
    tests already pass.
-2. Establish a persistent interactive device process for ordinary operation.
-   A process tied to a temporary terminal must not be mistaken for a
-   durable deployment; local hidden password entry requires an interactive
-   TTY.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
