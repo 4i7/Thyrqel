@@ -1,6 +1,6 @@
 # Cloudflare deployment and operation
 
-Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The ChatGPT client flow passed a public MCP status and Kali command test; sustained connection stability remains under qualification.
+Status: deployed at `https://thyrqel.4i7.workers.dev`. The checked-in Worker configuration contains the production public origin, GitHub OAuth client ID and OAUTH_KV binding. Secrets remain provisioned only in Cloudflare and are not committed. The ChatGPT client flow passed a public MCP status and Kali command test. A controlled WebSocket interruption through a loopback proxy to the production Worker preserved the device epoch, receipt and PowerShell session after reconnect.
 
 The authenticated account lookup on 2026-09-22 returned account `4i7`
 (`abeba566977e67c1d9d7f46bd8654487`) and Workers subdomain `4i7`.
@@ -106,6 +106,10 @@ retry an uncertain action.
 - Foreground-descendant and concurrent-exit PTY lifecycle gate: PASS on real
   PowerShell and WSL profiles. Detached-process and PID-reuse schedules remain
   outside this finite test.
+- Controlled production relay reconnect: PASS with a temporary loopback
+  WebSocket proxy. The device disconnected and reconnected without changing
+  process epoch; the existing PowerShell session and receipt remained usable.
+  This does not prove every arbitrary network or platform failure.
 
 The OAuth flow follows the official Cloudflare GitHub OAuth example, with
 owner binding, atomic consent consumption and no upstream-token retention:
