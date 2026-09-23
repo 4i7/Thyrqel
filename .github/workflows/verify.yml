@@ -39,10 +39,62 @@ jobs:
             ConvertTo-Json -Compress |
             Set-Content -LiteralPath (Join-Path $stage 'build.json') -Encoding utf8
           Compress-Archive -Path (Join-Path $stage '*') -DestinationPath 'device.zip'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
           name: thyrqel-device
           path: device.zip
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    needs: qualify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: thyrqel-device
+      - name: Publish the qualified Windows runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="device-$GITHUB_SHA"
+          remote_head="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          if [ "$remote_head" != "$GITHUB_SHA" ]; then
+            echo "Main advanced; skipping an obsolete device release"
+            exit 0
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists for this commit"
+            exit 0
+          fi
+          gh release create "$tag" device.zip --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Windows device $GITHUB_SHA" --notes "Built from this GitHub commit after Windows qualification." --latest
+
+  deploy:
+    needs: qualify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CF_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: thyrqel-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Deploy the qualified commit
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          remote_head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$remote_head" = "$GITHUB_SHA"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deploy --config cloudflare/wrangler.jsonc --message "GitHub $GITHUB_SHA"
