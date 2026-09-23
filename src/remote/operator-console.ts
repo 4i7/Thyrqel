@@ -16,13 +16,13 @@ export async function runOperatorConsole(manager: Pick<SessionManager, 'list' | 
     },
   });
   const terminal = createInterface({ input, output, terminal: true, historySize: 0 });
-  terminal.on('SIGINT', () => abort.abort());
-  terminal.on('close', () => abort.abort());
+  terminal.on('SIGINT', () => abort.abort('local Ctrl+C'));
+  terminal.on('close', () => abort.abort('local console closed'));
   display.write('Local controls: sessions | secret <profile-or-sessionId> | quit\n');
   try {
     while (!abort.signal.aborted) {
       const command = (await terminal.question('device> ', { signal: abort.signal })).trim();
-      if (command === 'quit') { abort.abort(); break; }
+      if (command === 'quit') { abort.abort('local quit'); break; }
       if (command === 'sessions') {
         for (const session of manager.list()) display.write(`${session.sessionId} ${session.profile} ${session.state}\n`);
         continue;
