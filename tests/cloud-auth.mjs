@@ -75,7 +75,10 @@ try {
   assert.equal(initialized.serverInfo.name, 'thyrqel-remote');
   assert.equal((await rpc('tools/list', {})).tools.length, 3);
   const tool = async (name, args = {}) => JSON.parse((await rpc('tools/call', { name, arguments: args })).content[0].text);
-  assert.equal((await tool('device_status')).online, false);
+  const offline = await tool('device_status');
+  assert.equal(offline.online, false);
+  assert.equal(offline.operatorAction.kind, 'START_WINDOWS_DEVICE');
+  assert.match(offline.operatorAction.command, /scripts\/start-device\.ps1/);
   assert.equal((await dispatch('/device', { headers: { Upgrade: 'websocket' } })).status, 401);
   const upgrade = await dispatch('/device', { headers: { Upgrade: 'websocket', Authorization: `Bearer ${deviceToken}` } });
   assert.equal(upgrade.status, 101);
