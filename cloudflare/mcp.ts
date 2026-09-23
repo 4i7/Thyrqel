@@ -5,15 +5,15 @@ import { terminalCallSchema } from '../src/remote/protocol.js';
 
 const offlineOperatorAction = {
   kind: 'START_WINDOWS_DEVICE',
-  message: 'The paired Windows device is offline. On the paired Windows machine, open a visible PowerShell 7 window in the Thyrqel checkout, run `npm.cmd run device`, keep that window open, then call device_status again before submitting terminal operations.',
-  command: 'npm.cmd run device',
+  message: 'The paired Windows device is offline. On the paired Windows machine, open a visible PowerShell 7 window, run the GitHub-built device launcher shown in command, keep that window open, then call device_status again before submitting terminal operations.',
+  command: "$launcher = Invoke-RestMethod 'https://raw.githubusercontent.com/4i7/Thyrqel/main/scripts/start-device.ps1'; & ([scriptblock]::Create($launcher))",
 } as const;
 
 export async function handleMcp(request: Request, broker: DurableObjectStub<import('./index.js').Broker>) {
   const server = new McpServer({ name: 'thyrqel-remote', version: '0.2.0' });
   const reply = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] });
   server.registerTool('device_status', {
-    description: 'Check device connectivity and its current process epoch. When the paired device is offline, the result includes an operatorAction telling the user to open a visible PowerShell 7 window on Windows, run `npm.cmd run device`, keep it open, and call device_status again. An epoch change means prior outcomes cannot be recovered; never resubmit old actions automatically.',
+    description: 'Check device connectivity and its current process epoch. When the paired device is offline, the result includes an operatorAction with the GitHub-built device launch command for a visible PowerShell 7 window. An epoch change means prior outcomes cannot be recovered; never resubmit old actions automatically.',
     inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false },
   }, async () => {
     const status = await broker.deviceStatus();
