@@ -55,6 +55,29 @@ configuration path can be passed as the command's argument. Configuration shape:
 
 The device starts no inbound listener. Ctrl+C shuts down its sessions. It retries
 transport connections only; credential rejection and protocol mismatch stop it.
+Keep the interactive PowerShell window open for local password entry. If it
+returns to `PS ...>`, the device has stopped; read its
+`Thyrqel device stopping:` line before restarting.
+
+If startup reports HTTP 401, the local token and the Worker digest may differ.
+From the repository directory, an authenticated Cloudflare account owner can
+recompute and upload the digest without printing the token:
+
+```powershell
+$deviceConfig = Get-Content (Join-Path $env:LOCALAPPDATA 'Thyrqel/device.json') -Raw | ConvertFrom-Json
+if ($deviceConfig.endpoint -ne 'https://thyrqel.4i7.workers.dev') { throw 'Unexpected endpoint' }
+$deviceDigest = [Convert]::ToHexString(
+  [Security.Cryptography.SHA256]::HashData(
+    [Text.Encoding]::UTF8.GetBytes($deviceConfig.token)
+  )
+).ToLowerInvariant()
+$deviceDigest | npx.cmd wrangler@4.136.1 secret put DEVICE_TOKEN_SHA256 --config cloudflare/wrangler.jsonc
+```
+
+Restart the device after a successful update. Do not paste its token into a
+chat, issue, or shell argument. A Worker secret change may interrupt a live
+device connection; reconcile uncertain operation results before submitting
+another action.
 
 The MCP tools are `device_status`, `terminal_submit`, and `terminal_result`.
 Submit accepts `open`, `list`, `input`, `read`, `close`, and `forget`. Its receipt
