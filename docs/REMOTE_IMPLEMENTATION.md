@@ -118,12 +118,26 @@ operation ID returned `alreadyAdmitted: true`. The test session was closed.
 The redeploy did not force a transport interruption, so it cannot prove the
 production reconnect path.
 
-## Remaining work before completion
+On 2026-09-23, a loopback-only temporary WebSocket proxy forwarded the
+local device to the production Worker. The operator opened a real PowerShell
+session, stored a variable and retained the input receipt, then terminated
+both proxy WebSocket legs without stopping the device process. The proxy
+observed a second upstream connection, the device reported `disconnected`
+then `connected`, and `device_status` retained the same online epoch.
+The earlier receipt remained `COMPLETE`, repeating its operation ID returned
+`alreadyAdmitted: true`, and the same session printed its pre-break variable.
+The test session was closed; the proxy and its owner-only temporary device
+configuration were removed. A separate interactive PowerShell window then
+restored direct production connectivity.
 
-1. Observe an actual production transport interruption with the device
-   process and epoch retained; verify that an existing session and receipt
-   remain usable after reconnect. Local WebSocket reconnect and result-replay
-   tests already pass.
+## Operational limits
+
+This controlled break exercises the production relay and device reconnect
+path through a local intermediary. It does not prove recovery from every
+Cloudflare outage, OS sleep, or network failure. The direct device runs only
+while its interactive PowerShell window remains open; automatic logon startup
+is not configured. `UNKNOWN_OUTCOME` still requires operator reconciliation
+rather than resubmission with a fresh operation ID.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
