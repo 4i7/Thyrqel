@@ -22,14 +22,20 @@ if (!Array.isArray(profiles)) throw new Error('Expected an operator profile arra
 const manager = new SessionManager(new ProfileRegistry(profiles), { environment: shellEnvironment(process.env) });
 const executor = new DeviceExecutor(manager);
 const abort = new AbortController();
-process.once('SIGINT', () => abort.abort());
-process.once('SIGTERM', () => abort.abort());
+process.once('SIGINT', () => abort.abort('process SIGINT'));
+process.once('SIGTERM', () => abort.abort('process SIGTERM'));
 console.error(`Thyrqel device epoch: ${executor.epoch}`);
 const operator = runOperatorConsole(manager, abort).catch(() => {
   console.error('Local operator console failed; stopping device');
-  abort.abort();
+  abort.abort('local operator console failed');
 });
 try {
   await runDeviceConnection(executor, config.endpoint, config.token, abort.signal,
     state => console.error(`Thyrqel device ${state}`));
-} finally { abort.abort(); await operator; manager.shutdown(); }
+} finally {
+  if (!abort.signal.aborted) abort.abort('device connection ended');
+  const reason = abort.signal.reason;
+  console.error(`Thyrqel device stopping: ${typeof reason === 'string' ? reason : 'unknown'}`);
+  await operator;
+  manager.shutdown();
+}
