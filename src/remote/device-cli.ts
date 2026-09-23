@@ -35,7 +35,7 @@ try {
 } finally {
   if (!abort.signal.aborted) abort.abort('device connection ended');
   const reason = abort.signal.reason;
-  console.error(Thyrqel device stopping: );
+  console.error(`Thyrqel device stopping: ${typeof reason === 'string' ? reason : 'unknown'}`);
   await operator;
   manager.shutdown();
 }
