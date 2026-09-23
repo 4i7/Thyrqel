@@ -71,25 +71,15 @@ Submission is not command completion. After sending shell input, read the same s
 
 ## Start the paired Windows device
 
-Use a visible, non-Administrator PowerShell 7 window on the paired Windows 11 machine. From this checkout:
+On the paired Windows machine, use a visible, non-Administrator PowerShell 7 window with Node.js 22 or newer. The operator configuration remains in %LOCALAPPDATA%\Thyrqel\device.json and profiles.json.
 
-```powershell
-npm.cmd ci
-npm.cmd run build
-npm.cmd run device
-```
+    $launcher = Invoke-RestMethod 'https://raw.githubusercontent.com/4i7/Thyrqel/main/scripts/start-device.ps1'
+    & ([scriptblock]::Create($launcher))
 
-Keep that PowerShell window open while ChatGPT is expected to control terminals. The device reads `%LOCALAPPDATA%/Thyrqel/device.json` by default and opens only an outbound connection to the production Worker.
+The launcher downloads the latest GitHub-built Windows release, checks its published SHA-256 digest and commit metadata, runs the device from a temporary directory, and removes that runtime after the process exits. Keep the window open for terminal access and local hidden password input. A local Git checkout, npm ci, TypeScript build, and Wrangler are not needed for normal device startup.
 
-If `device_status` reports `online: false`, start or restart this visible PowerShell device process:
-
-```powershell
-npm.cmd run device
-```
-
-The MCP status response also includes this operator guidance while the device is offline. Do not submit terminal operations until a fresh `device_status` reports `online: true`.
-
-## Initial local setup
+If device_status reports online: false, check whether this visible device window is still running. Start it with the command above if it has stopped, then call device_status again. An offline result does not authorize resending an uncertain terminal operation.
+## Developer setup from a checkout
 
 Requirements:
 
