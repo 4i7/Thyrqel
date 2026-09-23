@@ -1,14 +1,104 @@
-# Thyrqel — persistent Windows and WSL terminal MCP
+# Thyrqel
 
-Windows-side TypeScript library for persistent PowerShell 7 and WSL2 Kali PTYs.
-See [the local contract](docs/CP0_CONTRACT.md) and [qualification report](docs/CP1_REPORT.md)
-before use. See [the current implementation status](docs/REMOTE_IMPLEMENTATION.md)
-for qualification evidence and operational limits.
+Persistent Windows and WSL2 terminal control for ChatGPT through MCP.
 
-## Run
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://thyrqel.4i7.workers.dev/health)
+[![MCP](https://img.shields.io/badge/MCP-remote%20terminal-5A67D8)](https://modelcontextprotocol.io/)
+[![Windows 11](https://img.shields.io/badge/Windows-11-0078D4?logo=windows11&logoColor=white)](https://www.microsoft.com/windows/)
+[![WSL2 Kali](https://img.shields.io/badge/WSL2-Kali-557C94?logo=kalilinux&logoColor=white)](https://www.kali.org/docs/wsl/)
 
-Use a non-Administrator PowerShell 7 on Windows 11, with Node.js 22+ and an
-already provisioned WSL2 Kali user. No machine setup or distro changes are made.
+Thyrqel keeps PowerShell 7 and WSL2 Kali PTYs on the operator's Windows machine while ChatGPT controls them through an authenticated Cloudflare-hosted MCP relay. Sessions are persistent across tool calls, so working directories, shell state, environment variables, interactive programs and follow-up input can remain alive while the model reasons over incremental output.
+
+Production endpoint: [`https://thyrqel.4i7.workers.dev`](https://thyrqel.4i7.workers.dev)
+
+## What it does
+
+- Persistent `windows-pwsh` and `wsl-kali` terminal sessions.
+- Interactive raw PTY input and incremental reads instead of one-shot command execution.
+- ChatGPT-facing MCP tools for device status, operation submission and result retrieval.
+- GitHub OAuth owner binding for the MCP client.
+- Separate device credential for the Windows-side outbound WebSocket.
+- Durable operation admission and replayable receipts to avoid accidental duplicate execution.
+- Per-process epochs so requests from a previous device process are rejected after restart.
+- Local hidden secret input for password-backed `sudo` without placing passwords in model tool arguments.
+- Explicit shell environment allowlisting on the remote device path.
+
+There is no WSL-side agent, inbound listener, privileged broker or command-name denylist. OS authorization remains authoritative.
+
+## Architecture
+
+```text
+ChatGPT
+   |
+   | MCP + OAuth
+   v
+https://thyrqel.4i7.workers.dev/mcp
+   |
+   v
+Cloudflare Worker
+   |-- GitHub OAuth + owner binding
+   |-- OAUTH_KV
+   `-- Durable Object: Broker
+            |
+            | authenticated outbound WebSocket
+            v
+       Windows Thyrqel device
+            |
+            |-- operation journal
+            |-- SessionManager
+            `-- node-pty / ConPTY
+                   |-- PowerShell 7
+                   `-- WSL2 Kali / bash
+```
+
+The Windows device owns all real PTYs. Cloudflare brokers authenticated control traffic and durable operation state; terminal execution remains local to the paired Windows machine.
+
+## Current remote tools
+
+The production MCP surface intentionally exposes three tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `device_status` | Report whether the paired device is online and return its current process epoch. |
+| `terminal_submit` | Admit one terminal lifecycle/input/read operation under a fresh UUID. |
+| `terminal_result` | Retrieve the receipt for that exact operation without rerunning it. |
+
+`terminal_submit` supports `open`, `list`, `input`, `read`, `close` and `forget`.
+
+Submission is not command completion. After sending shell input, read the same session until the expected output or prompt is observed.
+
+## Start the paired Windows device
+
+Use a visible, non-Administrator PowerShell 7 window on the paired Windows 11 machine. From this checkout:
+
+```powershell
+npm.cmd ci
+npm.cmd run build
+npm.cmd run device
+```
+
+Keep that PowerShell window open while ChatGPT is expected to control terminals. The device reads `%LOCALAPPDATA%/Thyrqel/device.json` by default and opens only an outbound connection to the production Worker.
+
+If `device_status` reports `online: false`, start or restart this visible PowerShell device process:
+
+```powershell
+npm.cmd run device
+```
+
+The MCP status response also includes this operator guidance while the device is offline. Do not submit terminal operations until a fresh `device_status` reports `online: true`.
+
+## Initial local setup
+
+Requirements:
+
+- Windows 11
+- PowerShell 7
+- Node.js 22+
+- WSL2 with an already provisioned Kali Linux user
+
+Create the operator-owned local profile file:
 
 ```powershell
 npm.cmd ci
@@ -18,20 +108,70 @@ npm.cmd test
 npm.cmd run smoke
 ```
 
-`profiles.local.json` is ignored, operator-owned configuration. It is not a remote
-API. `npm run smoke -- path/to/profiles.json` selects another local configuration.
-The smoke gate fails on child stderr, failed assertions, or failure to terminate
-within 60 seconds. It never forces successful exit to hide retained handles.
+`profiles.local.json` is ignored by Git. No machine setup, distro provisioning, sudoers changes or account privilege changes are performed by Thyrqel.
 
-## Embed
+`npm ci` applies the version-checked [ConPTY lifecycle patch](docs/PTY_PATCH.md). Installing with `--ignore-scripts` does not produce the qualified runtime.
+
+## Typical ChatGPT flow
+
+```text
+1. device_status
+2. open wsl-kali or windows-pwsh
+3. input command text + carriage return
+4. terminal_result for the submitted operation
+5. read the session output
+6. reason over the output
+7. send follow-up input to the same session
+8. close and forget the test session when finished
+```
+
+This persistent loop is suitable for interactive shell work where state must survive between reasoning steps, including controlled lab environments such as local development, debugging and authorized training systems.
+
+## Local password input
+
+Do not send passwords through model tool calls.
+
+When a trusted program in a managed PTY is waiting for a password, use the visible device console locally:
+
+```text
+sessions
+secret <sessionId>
+```
+
+If exactly one ready session matches a profile, the profile shortcut is available:
+
+```text
+secret wsl-kali
+secret windows-pwsh
+```
+
+The value is entered locally with hidden input and bypasses MCP arguments and operation journals. Exact matching terminal echoes are redacted before entering the remote output ring. See [Cloudflare setup: local password input](docs/CLOUDFLARE_SETUP.md#local-password-input) for the full security boundary.
+
+## Local stdio MCP
+
+After `npm.cmd ci` and `npm.cmd run build`, a local MCP client can run:
+
+```text
+node <absolute-path>/dist/src/mcp/stdio.js <absolute-path>/profiles.local.json
+```
+
+or from this checkout:
+
+```powershell
+npm.cmd run mcp
+```
+
+The local stdio MCP exposes `terminal_open`, `terminal_list`, `terminal_input`, `terminal_read`, `terminal_close` and `terminal_forget`.
+
+## Library API
 
 ```typescript
 import { ProfileRegistry, SessionManager } from './dist/src/main.js';
+
 const manager = new SessionManager(new ProfileRegistry(operatorProfiles));
 try {
   const session = await manager.open('windows-pwsh');
   manager.write(session.sessionId, "Write-Output 'hello'\r");
-  // Read later as output arrives. A read is not a command-completion fence.
   console.log(manager.read(session.sessionId));
   manager.close(session.sessionId);
   manager.forget(session.sessionId);
@@ -40,49 +180,29 @@ try {
 }
 ```
 
-The example is an API shape, not a complete interactive client. Applications
-must poll/read asynchronously and install their own shutdown handlers.
-The local stdio MCP server and Cloudflare relay are implemented. The cloud
-deployment and ChatGPT client flow have been exercised through the public MCP
-endpoint. No GUI terminal,
-WSL-side agent or privileged broker is introduced. Embedded local shells inherit
-an environment snapshot; the remote device uses an explicit shell environment
-allowlist to exclude agent/provider credentials.
-
-## Local MCP
-
-After `npm.cmd ci` and `npm.cmd run build`, configure your local MCP client to run
-`node` with absolute arguments `dist/src/mcp/stdio.js` and `profiles.local.json`
-inside this checkout. Resolve both arguments to absolute paths before adding
-them to client configuration. `npm.cmd run mcp` is also available from this folder.
-
-Tools: `terminal_open`, `terminal_list`, `terminal_input`, `terminal_read`,
-`terminal_close`, `terminal_forget`. Input is raw PTY input; append `\r` to submit
-a line. Poll output separately and send follow-up input into the same session.
-`READY` is a session state, not a command-completion result. There is no
-command-name denylist; OS permissions remain in effect.
-
-Do not send passwords through model tool calls, which may be retained in client
-history. In the device's local interactive console, use `sessions`, then
-`secret <sessionId>` to enter a hidden value directly into that PTY. With one
-ready session for a profile, `secret wsl-kali` selects it. Verify that
-the intended program is waiting for it. See the security limits in
-[Cloudflare setup](docs/CLOUDFLARE_SETUP.md#local-password-input).
-
-`npm ci` applies the [version-checked ConPTY lifecycle patch](docs/PTY_PATCH.md).
-Installing with `--ignore-scripts` does not produce a qualified runtime.
+Applications must read asynchronously and provide their own shutdown handling. `READY` is a session state, not a command-completion fence.
 
 ## Cloudflare relay
 
-See [setup and current limitations](docs/CLOUDFLARE_SETUP.md). The remote device
-opens an outbound WebSocket and keeps PTYs locally. Cloudflare authenticates the
-MCP client through OAuth with explicit consent and a configured GitHub account.
-The deployed private ChatGPT app and production relay have passed a real
-Windows/WSL flow and a controlled reconnect check. On the paired Windows
-machine, build from GitHub `main` and run `npm.cmd run device` in an
-interactive PowerShell window; keep that window open. The local device reads
-`%LOCALAPPDATA%/Thyrqel/device.json` and accepts hidden password input only
-in its own console.
+Production origin:
+
+```text
+https://thyrqel.4i7.workers.dev
+```
+
+Important routes:
+
+```text
+/mcp       ChatGPT MCP endpoint
+/device    authenticated Windows-device WebSocket
+/authorize OAuth authorization
+/token     OAuth token exchange
+/register  dynamic MCP client registration
+/callback  GitHub OAuth callback
+/health    public service health
+```
+
+Local Cloudflare qualification commands:
 
 ```powershell
 npm.cmd run cloud:check
@@ -90,9 +210,39 @@ npm.cmd run cloud:test
 npm.cmd run cloud:live
 ```
 
-`cloud:test` runs real local Workers/DO/OAuth/MCP code with mocked GitHub and
-terminal peers. `cloud:live` connects that local relay to the configured real
-Windows/WSL PTYs; GitHub authentication is still mocked. Neither command deploys
-to Cloudflare. `cloud:live -- --sudo` requires existing noninteractive sudo
-authorization; this machine requires a password. Password-authenticated sudo
-was instead verified through public MCP and the device's hidden-input console.
+`cloud:test` runs the real Worker/DO/OAuth/MCP implementation with mocked GitHub and terminal peers. `cloud:live` connects the local relay implementation to configured real Windows and WSL PTYs while GitHub authentication remains mocked. Neither command deploys.
+
+## Reliability model
+
+Every device process has an epoch. Every submitted terminal operation has a caller-generated UUID.
+
+- Durable admission is recorded before dispatch.
+- The relay never automatically retries execution.
+- Reusing the same operation ID with the same payload returns the existing admission.
+- Reusing it with a different payload returns a conflict.
+- A device restart changes epoch and retires prior operation state.
+- `UNKNOWN_OUTCOME` requires reconciliation; it is not permission to resend an effect under a new ID.
+
+See [Cloudflare setup](docs/CLOUDFLARE_SETUP.md) for capacity limits and protocol details.
+
+## Qualification status
+
+The current implementation has passed bounded production checks for:
+
+- real ChatGPT -> public MCP -> Windows device control;
+- persistent PowerShell and WSL2 Kali sessions;
+- GitHub OAuth owner binding;
+- password-authenticated Kali `sudo` through local hidden input;
+- operation receipt replay and duplicate-operation suppression;
+- controlled production WebSocket interruption and reconnect with session/receipt preservation;
+- Windows/WSL foreground descendant cleanup and repeated exit/close races.
+
+Automatic Windows logon startup and exhaustive recovery from arbitrary Cloudflare outages, OS sleep, network failures, detached-process schedules and PID reuse remain outside the qualified boundary.
+
+## Documentation
+
+- [Current remote implementation status](docs/REMOTE_IMPLEMENTATION.md)
+- [Cloudflare deployment and operation](docs/CLOUDFLARE_SETUP.md)
+- [PTY lifecycle patch](docs/PTY_PATCH.md)
+- [Local contract](docs/CP0_CONTRACT.md)
+- [Historical CP1 qualification report](docs/CP1_REPORT.md)
