@@ -29,6 +29,7 @@ jobs:
         shell: pwsh
         run: |
           npm prune --omit=dev --ignore-scripts
+          node dist/tests/pty-patch.test.js
           node -e "import('node-pty').then(() => console.log('node-pty import PASS'))"
           $stage = Join-Path $env:RUNNER_TEMP 'thyrqel-device'
           New-Item -ItemType Directory -Path (Join-Path $stage 'dist') -Force | Out-Null
