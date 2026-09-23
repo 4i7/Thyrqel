@@ -1,0 +1,48 @@
+name: Verify and package Thyrqel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run cloud:check
+      - run: npm test
+      - run: npm run cloud:test
+      - name: Package the Windows device runtime
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          npm prune --omit=dev --ignore-scripts
+          node -e "import('node-pty').then(() => console.log('node-pty import PASS'))"
+          $stage = Join-Path $env:RUNNER_TEMP 'thyrqel-device'
+          New-Item -ItemType Directory -Path (Join-Path $stage 'dist') -Force | Out-Null
+          Copy-Item -LiteralPath 'dist/src' -Destination (Join-Path $stage 'dist') -Recurse
+          Copy-Item -LiteralPath 'node_modules' -Destination $stage -Recurse
+          Copy-Item -LiteralPath 'package.json' -Destination $stage
+          @{ commit = $env:GITHUB_SHA; nodeMajor = 22; platform = 'win32'; arch = 'x64' } |
+            ConvertTo-Json -Compress |
+            Set-Content -LiteralPath (Join-Path $stage 'build.json') -Encoding utf8
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath 'device.zip'
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: thyrqel-device
+          path: device.zip
+          if-no-files-found: error
+          retention-days: 30
