@@ -110,6 +110,14 @@ the public relay reported the same online epoch on a later check. This
 independent interactive window supports local hidden password entry while it
 stays open; automatic start at Windows logon is not configured.
 
+A redeploy of that same `main` Worker produced version
+`9d63852b-f42f-4d69-98e6-df61577b9262`. The device retained the same
+process, epoch and TCP connection; a pre-existing PowerShell session retained
+its variable, the earlier input receipt was still complete, and reusing its
+operation ID returned `alreadyAdmitted: true`. The test session was closed.
+The redeploy did not force a transport interruption, so it cannot prove the
+production reconnect path.
+
 ## Remaining work before completion
 
 1. Observe an actual production transport interruption with the device
