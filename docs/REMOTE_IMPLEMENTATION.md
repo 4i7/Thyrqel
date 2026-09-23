@@ -89,10 +89,31 @@ device; the public relay reported a new online epoch, and ChatGPT retrieved it
 through the existing OAuth connection. Unauthenticated `/mcp` and `/device`
 requests both returned HTTP 401.
 
+On 2026-09-23, a later local launch failed with HTTP 401. Recomputing the
+SHA-256 digest from the existing local device token and updating the Worker
+secret restored the connection; the prior cause of the mismatch is unknown.
+The recovered device stayed online for a bounded multi-minute check. A
+PowerShell session retained a variable, and resubmitting an existing operation
+ID returned `alreadyAdmitted: true`. Re-registering the same Worker secret
+did not interrupt the existing WebSocket, so this check does not qualify
+recovery from an actual transport break. Unauthenticated GETs to both
+`/device` and `/mcp` returned HTTP 401.
+
+PR #4 added secret-free local stop reasons. Its GitHub-branch build and 32
+tests passed; after merging to `main`, a real `quit` displayed
+`Thyrqel device stopping: local quit`. The device then reconnected from
+the merged build. The earlier silent exit remains unclassified.
+
 ## Remaining work before completion
 
-1. Qualify the reported disconnect/reconnect pattern over a sustained run,
-   including a session and result spanning a transport interruption.
+1. Observe an actual production transport interruption with the device
+   process and epoch retained; verify that an existing session and receipt
+   remain usable after reconnect. Local WebSocket reconnect and result-replay
+   tests already pass.
+2. Establish a persistent interactive device process for ordinary operation.
+   A process tied to a temporary terminal must not be mistaken for a
+   durable deployment; local hidden password entry requires an interactive
+   TTY.
 
 Wrangler 4.136.1 account verification: PASS after the operator completed browser
 login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
