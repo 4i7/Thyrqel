@@ -61,6 +61,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'The packaged node-pty module could not load.' }
     Write-Output "Verified GitHub device runtime: $commit"
   } else {
+    Set-Location -LiteralPath $env:USERPROFILE
     Write-Output "Starting GitHub device runtime: $commit"
     & node $entry
     if ($LASTEXITCODE -ne 0) { throw "Thyrqel device exited with code $LASTEXITCODE" }
