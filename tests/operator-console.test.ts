@@ -35,6 +35,7 @@ test('local console hides secret typing and history, and aborts without sending 
       assert.deepEqual(sent, cancel ? [] : ['synthetic-private-value']);
       assert.ok(!shown.includes('synthetic-private-value'));
       assert.equal(abort.signal.aborted, true);
+      assert.equal(abort.signal.reason, cancel ? 'local Ctrl+C' : 'local quit');
     } finally { abort.abort(); await running; input.destroy(); display.destroy(); }
   }
 });
@@ -70,5 +71,19 @@ test('profile shortcut selects exactly one live session and refuses stale or amb
     await running;
     assert.deepEqual(sent, ['synthetic-value']);
     assert.ok(!shown.includes('synthetic-value'));
+    assert.equal(abort.signal.reason, 'local quit');
+  } finally { abort.abort(); await running; input.destroy(); display.destroy(); }
+});
+
+test('closing the local TTY records a distinct stop reason', async () => {
+  const input = Object.assign(new PassThrough(), { isTTY: true, setRawMode() {} });
+  const display = Object.assign(new PassThrough(), { isTTY: true });
+  const abort = new AbortController();
+  const running = runOperatorConsole({ list: () => [], writeSecret: () => {} },
+    abort, input as unknown as typeof process.stdin, display as unknown as typeof process.stdout);
+  try {
+    input.end();
+    await running;
+    assert.equal(abort.signal.reason, 'local console closed');
   } finally { abort.abort(); await running; input.destroy(); display.destroy(); }
 });
