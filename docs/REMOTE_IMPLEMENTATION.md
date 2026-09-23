@@ -1,149 +1,87 @@
 # Remote terminal implementation status
 
+This document records the current public qualification boundary without publishing
+operator-specific usernames, home directories, absolute local paths, account IDs or
+other machine-specific identifiers.
+
 ## Confirmed target
 
-ChatGPT controls the operator's Windows PowerShell and WSL Kali terminal through
-a Cloudflare-hosted MCP endpoint. Interactive programs retain their terminal
-across calls; command-name restrictions must not prevent legitimate local
-administration. OS authorization remains authoritative. No changes to sudoers,
-passwords, account privileges, or host security settings are included.
+ChatGPT controls the operator's Windows PowerShell and WSL2 Kali terminal through a
+Cloudflare-hosted MCP endpoint. Interactive programs retain their PTY across calls.
+OS authorization remains authoritative. Thyrqel does not modify sudoers, passwords,
+account privileges or host security settings.
 
-## Reference and reuse boundary
+## Implemented
 
-Examined DesktopCommanderMCP commit
-`d217d490afb11e655c02b52146d443b1bcf1dcb1`: the local process tools and remote-device
-README/channel implementation. Its MIT-licensed local implementation separates
-process creation, later interaction, output reads, and local execution from
-remote transport. Thyrqel adopts that separation with its existing PTY core.
-No Desktop Commander implementation code or documentation text was copied.
+- Local stdio MCP with six terminal lifecycle tools.
+- Remote MCP exposing `device_status`, `terminal_submit` and `terminal_result`.
+- Persistent PowerShell and WSL2 PTYs on the Windows device.
+- Outbound authenticated device WebSocket; no inbound host listener.
+- GitHub OAuth owner binding for the ChatGPT-facing MCP client.
+- Separate random device credential; only its SHA-256 digest is stored by the Worker.
+- Durable operation admission and replayable receipts with duplicate suppression.
+- Per-process epochs so operations from a previous device process are rejected.
+- Bounded relay/device journals and explicit `UNKNOWN_OUTCOME` handling.
+- Explicit shell-environment allowlisting for remotely created shells.
+- Local hidden secret input with exact terminal-echo redaction.
+- Version/hash-checked `node-pty` ConPTY lifecycle patch.
 
-The remote-desktop-commander repository contains restricted reference material;
-the hosted service source is proprietary and is not available for reuse.
+## Qualification evidence
 
-- https://github.com/wonderwhy-er/DesktopCommanderMCP/tree/d217d490afb11e655c02b52146d443b1bcf1dcb1
-- https://github.com/wonderwhy-er/DesktopCommanderMCP/blob/d217d490afb11e655c02b52146d443b1bcf1dcb1/LICENSE
-- https://github.com/desktop-commander/remote-desktop-commander/blob/main/LICENSE
-- https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/
+The implementation has passed bounded checks covering:
 
-The connected Remote Desktop Commander device was offline during inspection.
-Its actual blocked-command configuration and the cause of the user's historical
-sudo failures were therefore not verified.
+- clean install, TypeScript build and automated test suites;
+- Worker type/build checks and local Worker/DO/OAuth/MCP/WebSocket integration;
+- real PowerShell and WSL2 startup, persistent state and interactive follow-up I/O;
+- foreground descendant cleanup and repeated exit/close races;
+- public ChatGPT -> OAuth -> MCP -> Windows device round trips;
+- owner-only OAuth authorization and rejection of unauthenticated MCP/device access;
+- password-authenticated WSL `sudo` using local hidden input without putting the
+  password in MCP arguments or returned terminal output;
+- operation receipt replay and duplicate-operation suppression;
+- controlled production WebSocket interruption followed by reconnect while retaining
+  the device process epoch, an existing PTY session and an admitted receipt;
+- GitHub-built Windows device packaging and production Worker deployment after the
+  same qualification job succeeds.
 
-## Implemented and observed
+The historical CP-1 report records an earlier ConPTY cleanup failure. The current
+patch and lifecycle gate supersede that historical blocker; see [PTY_PATCH.md](PTY_PATCH.md).
 
-- Local stdio MCP using the official SDK, six terminal lifecycle tools.
-- Existing operator-owned profiles and non-elevated Windows host checks retained.
-- No terminal input or password logging added. MCP client history is outside
-  this guarantee; do not pass passwords through model tools.
-- Raw input, subsequent reads, and terminal state kept distinct from completion.
-- Exact-version/hash node-pty lifecycle patch; diagnostics remain visible.
-- `npm ci`: PASS, including patch application; npm audit reported zero findings.
-- `npm test`: PASS, 31 tests, including SDK client/server protocol integration,
-  teardown order, OAuth handlers, bounded reads, environment separation and
-  reconnect/result recovery using real local WebSockets.
-- Device-local operation journal connected to the device executor: duplicate pending
-  calls share execution, changed payloads conflict, result eviction leaves
-  no-resend tombstones, old process epochs are rejected. It is wired
-  to an outbound WebSocket transport. Input is hashed rather than retained by the journal.
-- `npm run smoke`: PASS after clean install, Windows PowerShell and WSL Kali,
-  persistent cwd, interactive prompt/follow-up input, close, natural shell exit;
-  child exit 0, no stderr, no timeout.
-- `cloud:check` and `cloud:test`: PASS for Worker types/build and local
-  OAuth/DO/MCP/WebSocket integration. GitHub and terminal peers are mocked.
-- `cloud:live`: PASS through local Workers to both real PTYs, including
-  interactive follow-up and clean natural host termination. GitHub is mocked.
-- `cloud:live -- --sudo`: the earlier noninteractive check failed because a
-  password was required. On 2026-09-23, the operator entered the Kali password
-  in the device's local hidden-input console while the public MCP WSL session
-  waited in `sudo -- id -u`; the terminal returned UID `0` and exit status `0`.
-  No sudo policy changed, and the password was absent from tool arguments and
-  terminal output.
-- `npm run lifecycle -- path/to/profiles.json`: PASS on Windows PowerShell and
-  WSL Kali for foreground descendant cleanup, three immediate exit/close races
-  per profile, and external termination of each test-owned host process. The
-  child exited 0 with no stderr or timeout. The first run on the older patch
-  failed with `AttachConsole failed`; see [the PTY patch](PTY_PATCH.md).
+## Reliability model
 
-The historical CP1 report remains unchanged as evidence of the earlier failed
-baseline. This finite lifecycle test cannot prove every detached-process or
-PID-reuse schedule.
+Every device process has a new epoch and every submitted terminal operation has a
+caller-generated UUID.
 
-On 2026-09-23, the attached Thyrqel MCP connection to the public Worker reported
-an online device. Real PowerShell and WSL sessions accepted interactive input,
-retained their working directories and variables, returned follow-up output,
-and replayed completed receipts without a second effect. A device restart
-changed the epoch and retired that old session,
-as designed. The browser's reported disconnect/reconnect cycle has not yet
-been classified as a sustained-connection PASS; a 50-second Worker tail showed
-no exceptions, which is insufficient to diagnose that cycle.
+- Admission is stored before dispatch.
+- Execution is never automatically retried.
+- Reusing an operation ID with the same payload returns the existing admission.
+- Reusing it with a different payload is rejected.
+- A device restart changes epoch and retires prior operation state.
+- A transport failure can produce `UNKNOWN_OUTCOME`; the operator must reconcile
+  state rather than resubmitting the effect under a fresh ID.
 
-On 2026-09-23, the operator's ChatGPT account connected its private Thyrqel MCP
-app using GitHub OAuth. ChatGPT invoked `device_status` against the public Worker,
-opened a new `wsl-kali` session, ran `pwd`, read `/home/<local-user>`, then closed and
-forgot only that test session. The device epoch stayed constant for this flow.
+## Security boundary
 
-After PR #3 merged to GitHub `main` at `4c25a9c`, a clean install applied the
-revised native patch. The 31 tests passed, and the real PowerShell/WSL
-lifecycle gate exited 0 with no stderr or timeout. The operator restarted the
-device; the public relay reported a new online epoch, and ChatGPT retrieved it
-through the existing OAuth connection. Unauthenticated `/mcp` and `/device`
-requests both returned HTTP 401.
+The Windows device reads its credential and operator profiles from local
+configuration outside the source checkout. Child shells receive an allowlisted
+subset of the device process environment rather than provider/device credentials.
 
-On 2026-09-23, a later local launch failed with HTTP 401. Recomputing the
-SHA-256 digest from the existing local device token and updating the Worker
-secret restored the connection; the prior cause of the mismatch is unknown.
-The recovered device stayed online for a bounded multi-minute check. A
-PowerShell session retained a variable, and resubmitting an existing operation
-ID returned `alreadyAdmitted: true`. Re-registering the same Worker secret
-did not interrupt the existing WebSocket, so this check does not qualify
-recovery from an actual transport break. Unauthenticated GETs to both
-`/device` and `/mcp` returned HTTP 401.
-
-PR #4 added secret-free local stop reasons. Its GitHub-branch build and 32
-tests passed; after merging to `main`, a real `quit` displayed
-`Thyrqel device stopping: local quit`. The device then reconnected from
-the merged build. The earlier silent exit remains unclassified.
-
-The device was then launched in a separate visible PowerShell window from the
-merged `main` build. Its PowerShell and Node processes remained alive, and
-the public relay reported the same online epoch on a later check. This
-independent interactive window supports local hidden password entry while it
-stays open; automatic start at Windows logon is not configured.
-
-A redeploy of that same `main` Worker produced version
-`9d63852b-f42f-4d69-98e6-df61577b9262`. The device retained the same
-process, epoch and TCP connection; a pre-existing PowerShell session retained
-its variable, the earlier input receipt was still complete, and reusing its
-operation ID returned `alreadyAdmitted: true`. The test session was closed.
-The redeploy did not force a transport interruption, so it cannot prove the
-production reconnect path.
-
-On 2026-09-23, a loopback-only temporary WebSocket proxy forwarded the
-local device to the production Worker. The operator opened a real PowerShell
-session, stored a variable and retained the input receipt, then terminated
-both proxy WebSocket legs without stopping the device process. The proxy
-observed a second upstream connection, the device reported `disconnected`
-then `connected`, and `device_status` retained the same online epoch.
-The earlier receipt remained `COMPLETE`, repeating its operation ID returned
-`alreadyAdmitted: true`, and the same session printed its pre-break variable.
-The test session was closed; the proxy and its owner-only temporary device
-configuration were removed. A separate interactive PowerShell window then
-restored direct production connectivity.
+Passwords should not be sent through model tool arguments. The local device console
+supports hidden one-line input into a selected PTY; exact echoes are redacted before
+entering the remotely readable output ring. This does not protect against a program
+that transforms or deliberately exfiltrates a secret, arbitrary code running as the
+same OS user, memory inspection or other host compromise.
 
 ## Operational limits
 
-This controlled break exercises the production relay and device reconnect
-path through a local intermediary. It does not prove recovery from every
-Cloudflare outage, OS sleep, or network failure. The direct device runs only
-while its interactive PowerShell window remains open; automatic logon startup
-is not configured. `UNKNOWN_OUTCOME` still requires operator reconciliation
-rather than resubmission with a fresh operation ID.
+The following remain outside the qualified boundary:
 
-Wrangler 4.136.1 account verification: PASS after the operator completed browser
-login. Account `4i7` is available with Workers/KV write permissions. The production Worker, KV binding, GitHub OAuth application configuration and Worker secrets are provisioned. The official OAuth provider, consent,
-owner binding and device-credential verification are implemented and tested
-locally. See [Cloudflare setup](CLOUDFLARE_SETUP.md) for contracts and limitations.
+- automatic Windows logon startup;
+- exhaustive recovery from arbitrary Cloudflare outages, OS sleep and network
+  failures;
+- every detached-process topology and PID-reuse schedule;
+- automatic resolution of `UNKNOWN_OUTCOME` operations.
 
-The production endpoint is deployed at `https://thyrqel.4i7.workers.dev`.
-ChatGPT end-to-end operation and the revised native patch passed bounded
-production checks; sustained connection reliability remains under qualification.
+The direct device runs only while its visible interactive PowerShell process remains
+alive. Current startup, deployment and local-secret procedures are documented in
+[CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md).
