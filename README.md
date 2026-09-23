@@ -3,7 +3,7 @@
 Windows-side TypeScript library for persistent PowerShell 7 and WSL2 Kali PTYs.
 See [the local contract](docs/CP0_CONTRACT.md) and [qualification report](docs/CP1_REPORT.md)
 before use. See [the current implementation status](docs/REMOTE_IMPLEMENTATION.md)
-for qualification evidence and the remaining end-to-end work.
+for qualification evidence and operational limits.
 
 ## Run
 
@@ -77,6 +77,12 @@ Installing with `--ignore-scripts` does not produce a qualified runtime.
 See [setup and current limitations](docs/CLOUDFLARE_SETUP.md). The remote device
 opens an outbound WebSocket and keeps PTYs locally. Cloudflare authenticates the
 MCP client through OAuth with explicit consent and a configured GitHub account.
+The deployed private ChatGPT app and production relay have passed a real
+Windows/WSL flow and a controlled reconnect check. On the paired Windows
+machine, build from GitHub `main` and run `npm.cmd run device` in an
+interactive PowerShell window; keep that window open. The local device reads
+`%LOCALAPPDATA%/Thyrqel/device.json` and accepts hidden password input only
+in its own console.
 
 ```powershell
 npm.cmd run cloud:check
