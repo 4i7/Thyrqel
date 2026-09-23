@@ -1,137 +1,48 @@
 # CP-1 Local PTY qualification report
 
-Date: 2026-09-16 (local time). Overall implementation status: **PARTIAL**.
+This is a sanitized historical report. Machine-specific usernames, home directories,
+absolute local paths, host build identifiers and other operator-environment details
+have intentionally been removed because they are not required to understand the
+qualification result.
 
-**CP-1 Local PTY: BLOCKED** — stable node-pty cleanup qualification did not pass.
-This is an observed runtime/dependency blocker, not BLOCKED_BY_DESIGN.
+Date: 2026-09-16. Historical status: **PARTIAL / BLOCKED**.
 
-## Authority and scope
+## Scope
 
-User request: implement only CP-0 local contracts and CP-1 persistent PTY.
-Design file SHA-256:
-`5505fab3930fcfc72c211b5358d4a4ac0ec1bb9d14644f740b11f9c55f041b82`.
-Source: `C:/Users/<local-user>/Downloads/TerminalBridge_DESIGN_5505fab3.md`.
-No Cloudflare/MCP/relay/privileged broker or command completion was implemented.
+The original CP-1 work implemented persistent local PowerShell and WSL2 PTYs,
+readiness checks, bounded output storage, session lifecycle handling and real-host
+qualification gates. Cloud relay and remote MCP behavior were outside this initial
+checkpoint.
 
-## Material implementation
+## What passed
 
-| File | Responsibility |
-| --- | --- |
-| src/main.ts, src/types.ts | Embedded local API, state/error/identity types, CP-2 interface seams |
-| src/profiles.ts | Frozen operator registry, explicit pwsh and WSL argv |
-| src/session/manager.ts | Non-elevated host check, session IDs, admission, open/read/write/close/shutdown |
-| src/session/pty-session.ts | Readiness gate, PTY ownership, lifecycle, timestamps, exit cleanup |
-| src/session/readiness.ts | Echo-resistant startup probe and incremental identity parser |
-| src/session/output-ring.ts | 1 MiB bounded UTF-8 ring, loss accounting, split-surrogate handling |
-| tests/core.test.ts | Contract, failure and lifecycle regression tests |
-| tests/smoke.ts, tests/qualify.ts | Real Windows PTY tests and parent process termination/stderr gate |
-| package.json, package-lock.json, tsconfig.json | Exact dependency pins and reproducible build |
-| profiles.example.json, README.md, docs/CP0_CONTRACT.md | Operator setup and frozen local contract |
+- Reproducible dependency install and TypeScript build.
+- Contract/unit tests for startup parsing, UTF-8 output handling, identity checks,
+  failure cleanup and session lifecycle.
+- Real PowerShell and WSL2 startup/readiness.
+- Basic I/O and persistent working-directory behavior.
+- Explicit close/double-close behavior.
+- Natural shell exit at the application state-machine level.
+- Unsupported/invalid profile and session failure paths.
 
-## Observed environment
+## Historical blocker
 
-| Item | Value |
-| --- | --- |
-| OS | Windows 11 x64 |
-| Node.js | 24.15.0, Windows x64 |
-| npm | 11.14.1 |
-| node-pty | 1.1.0, exact candidate pin, **not qualified** |
-| TypeScript | 5.9.3 |
-| PowerShell | 7.6.5, Core |
-| PowerShell executable | C:/Users/<local-user>/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/powershell/pwsh.exe |
-| WSL | 2.7.14.0 |
-| Distribution | kali-linux, registered WSL version 2 |
-| Configured user | <local-user>; observed uid 1000 |
-| Observed Linux shell | /usr/bin/bash, argv0 /bin/bash, interactive flag present |
-| Initial Linux cwd | /home/<local-user> |
-| Windows privilege | Non-elevated token; Administrator role check false |
+The stable `node-pty` 1.1.0 Windows ConPTY cleanup path could emit an
+`AttachConsole failed` diagnostic during close or natural shell exit. Application
+state assertions passed, but the qualification gate correctly treated unexpected
+native stderr as a failure.
 
-## Verification
+The issue was traced to the timing of asynchronous console enumeration relative to
+ConPTY teardown. A bundled-ConPTY experiment and an older stable dependency were
+also evaluated and rejected as qualification candidates.
 
-| Test | Result | Evidence / qualification |
-| --- | --- | --- |
-| npm ci | PASS | Lockfile installs five packages, audit reports zero vulnerabilities |
-| TypeScript build | PASS | npm test compiles the project |
-| Contract/unit suite | PASS | 9 tests; startup chunk boundaries/echo, UTF-8 eviction/surrogates, identities, failure cleanup, lifecycle, registry limits |
-| PowerShell open/readiness | PASS | powershell/Core/7.6.5 and initial cwd observed through PTY |
-| PowerShell basic I/O | PASS | TB_PS_OK generated from split literals, not matched from input echo |
-| PowerShell persistent cwd | PASS | Set-Location TEMP then separate write verifies Get-Location |
-| PowerShell close/double close | PASS | API state CLOSED and subsequent write rejected; clean native cleanup is separately FAIL |
-| PowerShell shell exit | PASS | EXITED observed; native cleanup diagnostics remain |
-| Kali open/readiness | PASS | Configured user, nonzero uid, shell, interactive flag and initial cwd verified |
-| Kali basic I/O | PASS | TB_KALI_OK generated from split literals |
-| Kali persistent cwd | PASS | cd /tmp then separate write observes /tmp |
-| Kali close/double close | PASS | API state CLOSED; clean native cleanup is separately FAIL |
-| Kali shell exit | PASS | EXITED observed; native cleanup diagnostics remain |
-| Invalid profile/session | PASS | Explicit INVALID_PROFILE / INVALID_SESSION |
-| Startup timeout/early exit/identity mismatch | PASS | Injected PTY regression tests; not live negative-user qualification |
-| Clean Agent termination, OS ConPTY | PASS | Final child exits naturally with code 0; no process.exit workaround |
-| Clean native lifecycle qualification | FAIL | Child stderr contains node-pty AttachConsole failed; parent gate exits 1 |
-| Real nonexistent WSL user / default-root distro | NOT RUN | No distro default/user configuration was changed; wrong identity and uid 0 tested in parser |
-| CP-2 and later test matrices | NOT RUN | Explicitly outside this request |
+The later implementation introduced a narrowly scoped, version/hash-checked
+install-time patch and additional lifecycle tests. Current qualification status is
+maintained in [REMOTE_IMPLEMENTATION.md](REMOTE_IMPLEMENTATION.md) and
+[PTY_PATCH.md](PTY_PATCH.md).
 
-Final reproducible gate output:
+## Security and privacy note
 
-```text
-FAIL qualification: child exit=0, stderr=true, timeout=false
-```
-
-Relevant diagnostic:
-
-```text
-node_modules/node-pty/lib/conpty_console_list_agent.js:13
-var consoleProcessList = getConsoleProcessList(shellPid);
-Error: AttachConsole failed
-Node.js v24.15.0
-```
-
-The node-pty Windows implementation forks a console-list helper during kill.
-The helper fails to attach on this machine during close/exit cleanup. The exact
-native cause is not proven; attributing it solely to this application's state
-machine would be unsupported. State assertions alone do not qualify this path.
-
-## Dependency experiments and remaining blocker
-
-- **1.1.0 / OS ConPTY:** readiness and I/O pass. Initially natural-exit worker
-  resources were retained; explicit release on onExit fixed Agent termination.
-  AttachConsole failure remains and is not suppressed or reclassified as success.
-- **1.1.0 / bundled DLL:** public but upstream-experimental `useConptyDll` option
-  was tested. I/O assertions passed but Agent processes remained alive. It was
-  rejected and is absent from final code. Three identified lingering smoke
-  processes from the experiments were stopped explicitly.
-- **1.0.0:** stable fallback install failed in node-gyp configure, before smoke,
-  with FileNotFoundError for `build/deps/winpty/src/winpty-debugserver.vcxproj.filters`.
-  This is an environment/build failure, not proof that 1.0.0 cannot work generally.
-  `npm ci` restored the exact 1.1.0 candidate and original five-package graph.
-- **Prereleases:** not installed. No dependency source patch, private native API,
-  forced-success exit, or stderr suppression was introduced.
-
-To resume CP-1, qualify a supported stable node-pty/runtime combination with
-clean close and natural shell-exit cleanup, using the existing smoke gate.
-The final dependency choice remains pending that result. CP-2 is not authorized
-by this failed qualification and no CP-2 advancement checklist is presented.
-
-## Deliberate scope differences
-
-- The user's narrowed CP-0 takes precedence over the design's full distributed
-  CP-0 checklist. Completion/framing semantics remain unimplemented.
-- The requested flat local `src/` layout is used instead of the future monorepo.
-- Local reads drain raw strings; ANSI projection and delivery receipts are deferred.
-- Local configuration uses JSON and TypeScript types rather than introducing YAML.
-- Bounded session records add explicit operator `forget`; close is idempotent until
-  that record is deliberately removed. No idle eviction or network behavior is added.
-- No fully qualified node-pty version can yet be claimed. This is the substantive
-  unmet requirement preventing CP-1 PASS.
-
-## Git and local artifacts
-
-Repository had no commits, tracked files or configured remote at start, on unborn
-`master`. No branch, commit, push or PR was created. New implementation files remain
-untracked for review. Existing `TerminalBridge_ARCHITECTURE_FALSIFICATION_REVIEW.md`
-was read and left unchanged.
-
-Ignored `profiles.local.json` holds the actual operator executable/user settings.
-Ignored `node_modules/` and `dist/` are dependency/build outputs, not project source.
-The npm fallback-install diagnostic remains in the normal external npm cache log:
-`C:/Users/<local-user>/AppData/Local/npm-cache/_logs/2026-09-15T21_31_28_394Z-debug-0.log`.
-No temporary source experiment or vendored dependency patch is retained.
+Operator profile files remain local and ignored by Git. This public report does not
+record concrete local usernames, home directories, absolute paths, account names,
+log locations or host-specific identifiers.
